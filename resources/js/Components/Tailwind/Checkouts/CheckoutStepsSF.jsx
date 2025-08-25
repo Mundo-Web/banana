@@ -11,10 +11,10 @@ import { Local } from "sode-extend-react";
 import ProductNavigationSwiper from "../Products/ProductNavigationSwiper";
 
 export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos, items, contacts, data, generals = [] }) {
-   
+
     const [currentStep, setCurrentStep] = useState(1);
     const [descuentofinal, setDescuentoFinal] = useState(0);
-    
+
     // Calcular el precio total incluyendo IGV
     const totalPrice = cart.reduce((acc, item) => {
         const finalPrice = item.final_price;
@@ -23,10 +23,6 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
 
     // Estado para el costo de envío
     const [envio, setEnvio] = useState(0);
-
-    // Corregir cálculo del IGV y subtotal como en CheckoutSteps
-    const subTotal = parseFloat((totalPrice / 1.18).toFixed(2));
-    const igv = parseFloat((totalPrice - subTotal).toFixed(2));
 
     // Estados para cupones y descuentos automáticos
     const [couponDiscount, setCouponDiscount] = useState(0);
@@ -45,11 +41,23 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
         saleback_policy: "Políticas de devolucion y cambio",
     };
 
-    // Calcular total final con todos los descuentos
-    const totalWithoutDiscounts = subTotal + igv + parseFloat(envio);
+    // Calcular subtotal sin IGV del precio total original
+    const subTotalOriginal = parseFloat((totalPrice / 1.18).toFixed(2));
+
+    // Calcular subtotal después de descuentos
     const totalAllDiscounts = couponDiscount + automaticDiscountTotal + descuentofinal;
-    const totalFinal = Math.max(0, totalWithoutDiscounts - totalAllDiscounts);
-    
+    const subTotalAfterDiscounts = Math.max(0, subTotalOriginal - totalAllDiscounts);
+
+    // Calcular IGV sobre el subtotal después de descuentos (18%)
+    const igv = parseFloat((subTotalAfterDiscounts * 0.18).toFixed(2));
+
+    // El subtotal que se muestra es el original para efectos de visualización
+    const subTotal = subTotalOriginal;
+
+    // Calcular total final
+    const totalWithoutDiscounts = subTotal + parseFloat((subTotal * 0.18).toFixed(2)) + parseFloat(envio);
+    const totalFinal = Math.max(0, subTotalAfterDiscounts + igv + parseFloat(envio));
+
     const [sale, setSale] = useState([]);
     const [code, setCode] = useState([]);
     const [delivery, setDelivery] = useState([]);
@@ -84,7 +92,7 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
     // }, []);
 
     // Efecto para detectar el código en la URL
-    
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const urlCode = params.get("code");
@@ -124,14 +132,14 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
                 {/* Steps indicator */}
                 <div className="mb-4 md:mb-8">
                     <div className="flex items-center justify-between gap-1 md:gap-4 max-w-3xl mx-auto">
-                        <div className={`flex flex-col items-center md:flex-row md:items-center gap-1 md:gap-2 ${currentStep >=1 ? `customtext-primary font-medium` : "customtext-neutral-dark"}`}>
+                        <div className={`flex flex-col items-center md:flex-row md:items-center gap-1 md:gap-2 ${currentStep >= 1 ? `customtext-primary font-medium` : "customtext-neutral-dark"}`}>
                             <span className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs md:text-sm bg-primary text-white border-primary`}>1</span>
                             <span className="text-[10px] md:text-sm text-center">Carrito</span>
                         </div>
                         <div className="mb-4 lg:mb-0 flex-1 h-[2px] bg-gray-200 relative">
-                            <div 
-                                className={`absolute inset-0 transition-all duration-500 bg-primary`} 
-                                style={{ width: currentStep > 1 ? "100%" : "0%" }} 
+                            <div
+                                className={`absolute inset-0 transition-all duration-500 bg-primary`}
+                                style={{ width: currentStep > 1 ? "100%" : "0%" }}
                             />
                         </div>
                         <div className={`flex flex-col items-center md:flex-row md:items-center gap-1 md:gap-2 ${currentStep > 1 ? `customtext-primary font-medium` : "customtext-neutral-dark"}`}>
@@ -139,9 +147,9 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
                             <span className="text-[10px] md:text-sm text-center">Envío</span>
                         </div>
                         <div className="mb-4 lg:mb-0 flex-1 h-[2px] bg-gray-200 relative">
-                            <div 
-                                className={`absolute inset-0 transition-all duration-500 ${data?.gradient ? 'bg-gradient' : 'bg-primary'}`} 
-                                style={{ width: currentStep > 2 ? "100%" : "0%" }} 
+                            <div
+                                className={`absolute inset-0 transition-all duration-500 ${data?.gradient ? 'bg-gradient' : 'bg-primary'}`}
+                                style={{ width: currentStep > 2 ? "100%" : "0%" }}
                             />
                         </div>
                         <div className={`flex flex-col items-center md:flex-row md:items-center gap-1 md:gap-2 ${currentStep === 3 ? `${data?.gradient ? 'customtext-gradient' : 'customtext-primary'} font-medium` : "customtext-neutral-dark"}`}>
@@ -266,7 +274,7 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
                     generals.find((x) => x.correlative == key)?.description ??
                     "";
                 return (
-                     <ReactModal
+                    <ReactModal
                         key={index}
                         isOpen={modalOpen === index}
                         onRequestClose={closeModal}
@@ -287,14 +295,14 @@ export default function CheckoutStepsSF({ cart, setCart, user, prefixes, ubigeos
                                     <X size={24} strokeWidth={2} />
                                 </button>
                             </div>
-                            
+
                             {/* Content */}
                             <div className="flex-1 overflow-y-auto p-6">
                                 <div className="prose prose-gray max-w-none">
                                     <HtmlContent html={content} />
                                 </div>
                             </div>
-                            
+
                             {/* Footer */}
                             <div className="flex justify-end p-6 border-t border-gray-200">
                                 <button

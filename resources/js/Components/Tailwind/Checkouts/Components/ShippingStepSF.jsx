@@ -64,12 +64,12 @@ export default function ShippingStepSF({
     // Función para formatear el número de teléfono evitando duplicación de prefijos
     const formatPhoneNumber = (phonePrefix, phoneNumber) => {
         if (!phoneNumber) return "";
-        
+
         // Si el número ya comienza con el prefijo, no lo agregamos de nuevo
         if (phoneNumber.startsWith(phonePrefix)) {
             return phoneNumber;
         }
-        
+
         // Si no, concatenamos el prefijo
         return `${phonePrefix}${phoneNumber}`;
     };
@@ -77,12 +77,12 @@ export default function ShippingStepSF({
     // Función para limpiar el número de teléfono del usuario removiendo prefijos duplicados
     const cleanPhoneNumber = (phoneNumber, phonePrefix) => {
         if (!phoneNumber) return "";
-        
+
         // Si el número comienza con el prefijo, lo removemos
         if (phoneNumber.startsWith(phonePrefix)) {
             return phoneNumber.substring(phonePrefix.length);
         }
-        
+
         return phoneNumber;
     };
 
@@ -90,7 +90,7 @@ export default function ShippingStepSF({
     const [coupon, setCoupon] = useState(null);
     const [selectedUbigeo, setSelectedUbigeo] = useState(null);
     const [defaultUbigeoOption, setDefaultUbigeoOption] = useState(null);
-    
+
     // Estados para los descuentos automáticos calculados
     const [autoDiscounts, setAutoDiscounts] = useState([]);
     const [autoDiscountTotal, setAutoDiscountTotal] = useState(0);
@@ -111,19 +111,19 @@ export default function ShippingStepSF({
 
         try {
             console.log('🔄 ShippingStepSF: Calculating automatic discounts...', { cart, totalWithoutDiscounts });
-            
+
             const result = await DiscountRulesRest.applyToCart(cart, totalWithoutDiscounts);
-            
+
             if (result.success && result.data) {
                 const discounts = DiscountRulesRest.formatDiscounts(result.data.applied_discounts);
                 const discountAmount = result.data.total_discount || 0;
-                
+
                 console.log('✅ ShippingStepSF: Automatic discounts calculated', {
                     discounts,
                     discountAmount,
                     freeItems: result.data.free_items
                 });
-                
+
                 return {
                     discounts: result.data.applied_discounts,
                     total: discountAmount
@@ -132,7 +132,7 @@ export default function ShippingStepSF({
         } catch (error) {
             console.error('❌ Error calculating automatic discounts:', error);
         }
-        
+
         return { discounts: [], total: 0 };
     };
 
@@ -148,7 +148,7 @@ export default function ShippingStepSF({
             setAutoDiscountTotal(0);
         }
     }, [cart, automaticDiscounts, totalWithoutDiscounts]);
-    
+
     // Tipos de documentos como en ComplaintStech
     const typesDocument = [
         { value: "dni", label: "DNI" },
@@ -156,11 +156,11 @@ export default function ShippingStepSF({
         { value: "ce", label: "CE" },
         { value: "pasaporte", label: "Pasaporte" },
     ];
-    
+
     const [formData, setFormData] = useState(() => {
         const initialPhonePrefix = user?.phone_prefix || "51";
         const initialPhone = cleanPhoneNumber(user?.phone || "", initialPhonePrefix);
-        
+
         return {
             name: user?.name || "",
             lastname: user?.lastname || "",
@@ -182,13 +182,13 @@ export default function ShippingStepSF({
             businessName: user?.businessName || "", // Nuevo campo para Razón Social
         };
     });
-    
+
     // Efecto para actualizar formData cuando cambien los datos del usuario
     useEffect(() => {
         if (user) {
             const userPhonePrefix = user.phone_prefix || "51";
             const cleanedPhone = cleanPhoneNumber(user.phone || "", userPhonePrefix);
-            
+
             setFormData(prev => ({
                 ...prev,
                 name: user.name || "",
@@ -211,27 +211,27 @@ export default function ShippingStepSF({
             }));
         }
     }, [user]);
-    
+
     useEffect(() => {
         if (user?.ubigeo && user?.district && user?.province && user?.department) {
-          const defaultOption = {
-            value: user.ubigeo,
-            label: `${user.district}, ${user.province}, ${user.department}`,
-            data: {
-              reniec: user.ubigeo,
-              departamento: user.department,
-              provincia: user.province,
-              distrito: user.district
-            }
-          };
-          setDefaultUbigeoOption(defaultOption);
-          setSelectedUbigeo(defaultOption); // Actualiza el estado del ubigeo seleccionado
-          handleUbigeoChange(defaultOption);
+            const defaultOption = {
+                value: user.ubigeo,
+                label: `${user.district}, ${user.province}, ${user.department}`,
+                data: {
+                    reniec: user.ubigeo,
+                    departamento: user.department,
+                    provincia: user.province,
+                    distrito: user.district
+                }
+            };
+            setDefaultUbigeoOption(defaultOption);
+            setSelectedUbigeo(defaultOption); // Actualiza el estado del ubigeo seleccionado
+            handleUbigeoChange(defaultOption);
         }
-      }, [user]);
+    }, [user]);
 
     const getContact = (correlative) => {
-    return (
+        return (
             contacts.find((contact) => contact.correlative === correlative)
                 ?.description || ""
         );
@@ -261,7 +261,7 @@ export default function ShippingStepSF({
     const [errors, setErrors] = useState({});
     const [searchInput, setSearchInput] = useState("");
     const [expandedCharacteristics, setExpandedCharacteristics] = useState(false);
-    
+
     // Estados para cupones mejorados
     const [couponCode, setCouponCode] = useState("");
     const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -281,13 +281,13 @@ export default function ShippingStepSF({
     const numericSubTotal = typeof subTotal === 'number' ? subTotal : parseFloat(subTotal) || 0;
     const numericIgv = typeof igv === 'number' ? igv : parseFloat(igv) || 0;
     const hasShippingFree = parseFloat(getContact("shipping_free"));
-   
+
     const subFinal = numericSubTotal + numericIgv - descuentofinal - autoDiscountTotal;
-    
+
     // Función de validación mejorada con alertas específicas
     const validateForm = () => {
         const newErrors = {};
-        
+
         // Validación de campos obligatorios
         if (!formData.name) newErrors.name = "Nombre es requerido";
         if (!formData.lastname) newErrors.lastname = "Apellido es requerido";
@@ -338,10 +338,10 @@ export default function ShippingStepSF({
     // Función para enfocar el primer campo con error y hacer scroll suave
     const focusFirstError = (errors) => {
         const firstErrorKey = Object.keys(errors)[0];
-        
+
         setTimeout(() => {
             let targetElement = null;
-            
+
             if (firstErrorKey === 'ubigeo') {
                 targetElement = document.getElementById('ubigeo-select-container');
             } else if (firstErrorKey === 'phone_prefix') {
@@ -352,13 +352,13 @@ export default function ShippingStepSF({
 
             if (targetElement) {
                 highlightElement(targetElement);
-                
+
                 // Scroll suave al elemento
                 targetElement.scrollIntoView({
                     behavior: 'smooth',
                     block: 'center'
                 });
-                
+
                 // Enfocar si es un input
                 if (['INPUT', 'SELECT', 'TEXTAREA'].includes(targetElement.tagName)) {
                     targetElement.focus();
@@ -372,10 +372,10 @@ export default function ShippingStepSF({
         element.classList.add('highlight-error');
         setTimeout(() => element.classList.remove('highlight-error'), 2000);
     };
-    
+
     const handleUbigeoChange = async (selected) => {
         if (!selected) return;
-        
+
         setErrors(prev => ({ ...prev, ubigeo: "" }));
         const { data } = selected;
 
@@ -396,9 +396,9 @@ export default function ShippingStepSF({
             });
 
             const options = [];
-            
+
             const isFreeShipping = subFinal >= hasShippingFree;
-            
+
             if (isFreeShipping) {
                 options.push({
                     type: "free",
@@ -450,7 +450,7 @@ export default function ShippingStepSF({
             setShippingOptions(options);
             setSelectedOption(options[0].type);
             setEnvio(options[0].price);
-           
+
         } catch (error) {
             console.error("Error al obtener precios de envío:", error);
             toast.success('Sin cobertura', {
@@ -459,7 +459,7 @@ export default function ShippingStepSF({
                 duration: 3000,
                 position: 'top-right',
             });
-            
+
             setShippingOptions([]);
             setSelectedOption(null);
             setEnvio(0);
@@ -579,7 +579,7 @@ export default function ShippingStepSF({
     // }, [distrito]);
 
     const handlePayment = async (e) => {
-        
+
         if (e && e.preventDefault) {
             e.preventDefault();
         }
@@ -631,7 +631,7 @@ export default function ShippingStepSF({
                 number: formData?.number || "",
                 comment: formData?.comment || "",
                 reference: formData?.reference || "",
-                amount: totalFinal || 0,
+                amount: appliedCoupon ? finalTotalWithCoupon : totalFinal,
                 delivery: envio,
                 delivery_type: deliveryType, // Agregar delivery_type
                 cart: cart,
@@ -642,19 +642,19 @@ export default function ShippingStepSF({
                 // Agregar descuentos automáticos
                 automatic_discounts: autoDiscounts,
                 automatic_discount_total: autoDiscountTotal,
-                coupon_id: coupon ? coupon.id : null,
-                coupon_discount: descuentofinal || 0,
-                total_amount: totalFinal || 0,
+                coupon_id: appliedCoupon ? appliedCoupon.id : null,
+                coupon_discount: calculatedCouponDiscount || 0,
+                total_amount: appliedCoupon ? finalTotalWithCoupon : totalFinal,
             };
-           
+
             const response = await processMercadoPagoPayment(request)
             const data = response;
-            
+
             if (data.status) {
                 setSale(data.sale);
                 setDelivery(data.delivery);
                 setCode(data.code);
-                
+
                 // Ejecutar scripts de conversión si existen
                 if (conversionScripts && Array.isArray(conversionScripts)) {
                     conversionScripts.forEach(script => {
@@ -670,7 +670,7 @@ export default function ShippingStepSF({
                 if (onPurchaseComplete) {
                     onPurchaseComplete(data);
                 }
-                
+
             } else {
                 toast.error("Error en el Pago", {
                     description: "El pago ha sido rechazado",
@@ -692,46 +692,46 @@ export default function ShippingStepSF({
 
     useEffect(() => {
         const htmlTemplate = (data) => {
-          const prefix = data.element.dataset.code
-          const flag = data.element.dataset.flag
-          return renderToString(<span>
-            <span className="inline-block w-8 font-emoji text-center">{flag}</span>
-            <b className="me-1">{data.text}</b>
-            <span className="text-sm text-opacity-20">{prefix}</span>
-          </span>)
+            const prefix = data.element.dataset.code
+            const flag = data.element.dataset.flag
+            return renderToString(<span>
+                <span className="inline-block w-8 font-emoji text-center">{flag}</span>
+                <b className="me-1">{data.text}</b>
+                <span className="text-sm text-opacity-20">{prefix}</span>
+            </span>)
         }
         $('.select2-prefix-selector').select2({
-          dropdownCssClass: 'py-1',
-          containerCssClass: '!border !border-gray-300 !rounded p-2 !h-[42px]',
-          arrowCssClass: '!text-primary top-1/2 -translate-y-1/2"',
-          //minimumResultsForSearch: -1,
-          templateResult: function (data) {
-            if (!data.id) {
-              return data.text;
+            dropdownCssClass: 'py-1',
+            containerCssClass: '!border !border-gray-300 !rounded p-2 !h-[42px]',
+            arrowCssClass: '!text-primary top-1/2 -translate-y-1/2"',
+            //minimumResultsForSearch: -1,
+            templateResult: function (data) {
+                if (!data.id) {
+                    return data.text;
+                }
+                var $container = $(htmlTemplate(data));
+                return $container;
+            },
+            templateSelection: function (data) {
+                if (!data.id) {
+                    return data.text;
+                }
+                var $container = $(htmlTemplate(data));
+                return $container;
+            },
+            matcher: function (params, data) {
+                if (!params.term || !data.element) return data;
+
+                const country = data.element.dataset.country || '';
+                const text = data.text || '';
+
+                if (country.toLowerCase().includes(params.term.toLowerCase()) ||
+                    text.toLowerCase().includes(params.term.toLowerCase())) {
+                    return data;
+                }
+
+                return null;
             }
-            var $container = $(htmlTemplate(data));
-            return $container;
-          },
-          templateSelection: function (data) {
-            if (!data.id) {
-              return data.text;
-            }
-            var $container = $(htmlTemplate(data));
-            return $container;
-          },
-          matcher: function (params, data) {
-            if (!params.term || !data.element) return data;
-      
-            const country = data.element.dataset.country || '';
-            const text = data.text || '';
-      
-            if (country.toLowerCase().includes(params.term.toLowerCase()) ||
-                text.toLowerCase().includes(params.term.toLowerCase())) {
-              return data;
-            }
-      
-            return null;
-          }
         });
     }, [formData.phone_prefix])
 
@@ -744,7 +744,7 @@ export default function ShippingStepSF({
 
     const handleContinueClick = (e) => {
         e.preventDefault();
-        
+
         if (e && e.preventDefault) {
             e.preventDefault();
         }
@@ -758,7 +758,7 @@ export default function ShippingStepSF({
             focusFirstError(errors);
             return;
         }
-    
+
         if (!selectedOption) {
             toast.error('Seleccione envío', {
                 description: `Debe elegir un método de envío`,
@@ -768,13 +768,13 @@ export default function ShippingStepSF({
             });
             return;
         }
-        
+
         setShowPaymentModal(true);
     };
 
     const validateFormOld = () => {
         const newErrors = {};
-        
+
         // Validación de campos
         if (!formData.name) newErrors.name = "Nombre es requerido";
         if (!formData.lastname) newErrors.lastname = "Apellido es requerido";
@@ -784,9 +784,9 @@ export default function ShippingStepSF({
         if (!formData.address) newErrors.address = "Dirección es requerida";
         if (!formData.document) newErrors.document = "Documento es requerido";
         if (!formData.number) newErrors.number = "Numero es requerido";
-    
+
         setErrors(newErrors);
-    
+
         // Función de smooth scroll personalizada
         const smoothScroll = (targetElement, duration = 800) => {
             const targetPosition =
@@ -794,21 +794,21 @@ export default function ShippingStepSF({
                 window.pageYOffset -
                 window.innerHeight / 2 +
                 targetElement.offsetHeight / 2;
-        
+
             const startPosition = window.pageYOffset;
             let startTime = null;
-        
+
             const animation = (currentTime) => {
                 if (startTime === null) startTime = currentTime;
                 const timeElapsed = currentTime - startTime;
-        
+
                 const easeInOutQuad = (t, b, c, d) => {
                     t /= d / 2;
                     if (t < 1) return (c / 2) * t * t + b;
                     t--;
                     return (-c / 2) * (t * (t - 2) - 1) + b;
                 };
-        
+
                 const run = easeInOutQuad(
                     timeElapsed,
                     startPosition,
@@ -816,7 +816,7 @@ export default function ShippingStepSF({
                     duration
                 );
                 window.scrollTo(0, run);
-        
+
                 if (timeElapsed < duration) {
                     requestAnimationFrame(animation);
                 } else {
@@ -829,17 +829,17 @@ export default function ShippingStepSF({
                     }
                 }
             };
-        
+
             requestAnimationFrame(animation);
         };
-    
+
         // Si hay errores, hacer scroll al primero
         if (Object.keys(newErrors).length > 0) {
             const firstErrorKey = Object.keys(newErrors)[0];
-            
+
             setTimeout(() => {
                 let targetElement = null;
-                
+
                 if (firstErrorKey === 'ubigeo') {
                     targetElement = document.getElementById('ubigeo-select-container');
                 } else if (firstErrorKey === 'phone_prefix') {
@@ -847,24 +847,24 @@ export default function ShippingStepSF({
                 } else {
                     targetElement = document.querySelector(`[name="${firstErrorKey}"]`);
                 }
-    
+
                 if (targetElement) {
                     // Aplicar clase de error temporal
                     targetElement.classList.add('highlight-error');
                     setTimeout(() => targetElement.classList.remove('highlight-error'), 2000);
-                    
+
                     // Scroll personalizado
                     smoothScroll(targetElement, 600);
                 }
             }, 100);
         }
-    
+
         return Object.keys(newErrors).length === 0;
     };
 
     const handlePaymentComplete = async (paymentMethod) => {  // Cambiado de 'method' a 'paymentMethod'
         try {
-            
+
             setShowPaymentModal(false);
             setCurrentPaymentMethod(paymentMethod);
 
@@ -897,7 +897,7 @@ export default function ShippingStepSF({
                     number: formData?.number || "",
                     comment: formData?.comment || "",
                     reference: formData?.reference || "",
-                    amount: totalPrice || 0,
+                    amount: appliedCoupon ? finalTotalWithCoupon : totalFinal, // Usar el total final calculado correctamente
                     delivery: envio,
                     delivery_type: deliveryType, // Agregar delivery_type
                     cart: cart,
@@ -912,18 +912,18 @@ export default function ShippingStepSF({
                     // Descuentos automáticos
                     automatic_discounts: autoDiscounts,
                     automatic_discount_total: autoDiscountTotal,
-                    total_amount: finalTotalWithCoupon || 0,
+                    total_amount: appliedCoupon ? finalTotalWithCoupon : totalFinal,
                 };
-                
+
                 try {
                     const response = await processMercadoPagoPayment(request)
                     const data = response;
-                    
+
                     if (data.status) {
                         setSale(data.sale);
                         setDelivery(data.delivery);
                         setCode(data.code);
-                        
+
                         // Ejecutar scripts de conversión si existen
                         if (conversionScripts && Array.isArray(conversionScripts)) {
                             conversionScripts.forEach(script => {
@@ -939,7 +939,7 @@ export default function ShippingStepSF({
                         if (onPurchaseComplete) {
                             onPurchaseComplete(data);
                         }
-                        
+
                     } else {
                         toast.error('Error en el Pago', {
                             description: `El pago ha sido rechazado`,
@@ -957,7 +957,7 @@ export default function ShippingStepSF({
                         position: 'bottom-center',
                     });
                 }
-            }else if(paymentMethod === "yape") {
+            } else if (paymentMethod === "yape") {
 
                 console.log('🛒 ShippingStepSF: Sending cart details for Yape:', cart);
                 console.log('🔍 Cart items with project data:', cart.map(item => ({
@@ -968,7 +968,7 @@ export default function ShippingStepSF({
                     project_id: item.project_id,
                     canvas_project_id: item.canvas_project_id
                 })));
-                
+
                 // Obtener el delivery_type del shipping option seleccionado
                 const selectedShippingOption = shippingOptions.find(option => option.type === selectedOption);
                 const deliveryType = selectedShippingOption ? selectedShippingOption.deliveryType : 'domicilio';
@@ -990,7 +990,7 @@ export default function ShippingStepSF({
                     number: formData?.number || "",
                     comment: formData?.comment || "",
                     reference: formData?.reference || "",
-                    amount: totalPrice || 0,
+                    amount: appliedCoupon ? finalTotalWithCoupon : totalFinal, // Usar el total final calculado correctamente
                     delivery: envio,
                     delivery_type: deliveryType, // Agregar delivery_type
                     details: JSON.stringify(cart.map((item) => ({
@@ -1011,7 +1011,7 @@ export default function ShippingStepSF({
                     // Descuentos automáticos
                     automatic_discounts: autoDiscounts,
                     automatic_discount_total: autoDiscountTotal,
-                    total_amount: finalTotalWithCoupon || 0,
+                    total_amount: appliedCoupon ? finalTotalWithCoupon : totalFinal,
                 };
 
                 console.log('📤 Request creado para Yape:', request);
@@ -1019,7 +1019,7 @@ export default function ShippingStepSF({
 
                 setPaymentRequest(request);
                 setShowVoucherModal(true);
-            }else if(paymentMethod === "transferencia") {
+            } else if (paymentMethod === "transferencia") {
 
                 console.log('🛒 ShippingStepSF: Sending cart details for transferencia:', cart);
                 // Obtener el delivery_type del shipping option seleccionado
@@ -1043,7 +1043,7 @@ export default function ShippingStepSF({
                     number: formData?.number || "",
                     comment: formData?.comment || "",
                     reference: formData?.reference || "",
-                    amount: totalPrice || 0,
+                    amount: appliedCoupon ? finalTotalWithCoupon : totalFinal, // Usar el total final calculado correctamente
                     delivery: envio,
                     delivery_type: deliveryType, // Agregar delivery_type
                     details: JSON.stringify(cart.map((item) => ({
@@ -1064,7 +1064,7 @@ export default function ShippingStepSF({
                     // Descuentos automáticos
                     automatic_discounts: autoDiscounts,
                     automatic_discount_total: autoDiscountTotal,
-                    total_amount: finalTotalWithCoupon || 0,
+                    total_amount: appliedCoupon ? finalTotalWithCoupon : totalFinal,
                 };
                 setPaymentRequest(request);
                 setShowVoucherModalBancs(true);
@@ -1091,7 +1091,7 @@ export default function ShippingStepSF({
         });
     }, [formData]);
 
-    
+
     // Función para validar cupón
     const validateCoupon = async () => {
         if (!couponCode.trim()) {
@@ -1135,18 +1135,18 @@ export default function ShippingStepSF({
 
             // Manejar diferentes estructuras de respuesta
             const data = response.data || response; // response.data para nueva estructura, response para estructura anterior
-            
+
             if (data && data.valid) {
                 setAppliedCoupon(data.coupon);
                 // Redondear el descuento a 2 decimales para evitar problemas de precisión
                 const roundedDiscount = Math.round(data.discount * 100) / 100;
                 setCouponDiscount(roundedDiscount);
                 setCouponCode("");
-                
+
                 // Actualizar estados del padre si existen
                 if (setParentCouponCode) setParentCouponCode(data.coupon.code);
                 if (setParentCouponDiscount) setParentCouponDiscount(roundedDiscount);
-                
+
                 toast.success("Cupón aplicado", {
                     description: `Descuento de S/ ${Number2Currency(roundedDiscount)} aplicado`,
                     icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
@@ -1156,13 +1156,13 @@ export default function ShippingStepSF({
             } else {
                 const errorMessage = data?.message || "Cupón inválido o no aplicable a estos productos";
                 setCouponError(errorMessage);
-                
+
                 // Mejorar el mensaje de error para casos específicos
                 let toastMessage = errorMessage;
                 if (errorMessage.includes("monto mínimo")) {
                     toastMessage = `${errorMessage} Tu carrito actual: S/ ${Number2Currency(subTotal)}`;
                 }
-                
+
                 toast.error("Cupón inválido", {
                     description: toastMessage,
                     icon: <CircleX className="h-5 w-5 text-red-500" />,
@@ -1174,7 +1174,7 @@ export default function ShippingStepSF({
             console.error("Error validating coupon:", error);
             const errorMessage = error.response?.data?.message || "Error al validar el cupón";
             setCouponError(errorMessage);
-            
+
             toast.error("Error de validación", {
                 description: errorMessage,
                 icon: <CircleX className="h-5 w-5 text-red-500" />,
@@ -1192,11 +1192,11 @@ export default function ShippingStepSF({
         setCouponCode("");
         setCouponDiscount(0);
         setCouponError("");
-        
+
         // Actualizar estados del padre si existen
         if (setParentCouponCode) setParentCouponCode("");
         if (setParentCouponDiscount) setParentCouponDiscount(0);
-        
+
         toast.success("Cupón removido", {
             description: "El cupón ha sido removido del pedido",
             icon: <InfoIcon className="h-5 w-5 text-blue-500" />,
@@ -1215,7 +1215,7 @@ export default function ShippingStepSF({
 
     // El descuento del cupón ya viene calculado desde el backend
     let calculatedCouponDiscount = couponDiscount || 0;
-    
+
     // Sincronizar el estado para mantener compatibilidad visual
     useEffect(() => {
         if (setParentCouponDiscount) {
@@ -1289,34 +1289,34 @@ export default function ShippingStepSF({
 
     const customStyles = {
         control: (provided, state) => ({
-          ...provided,
-          padding: '0.5rem',
-          borderColor: state.isFocused ? '#d1d5db' : '#d1d5db', // gray-300
-          borderRadius: '0.75rem', // rounded-xl
-          boxShadow: 'none',
-          '&:hover': {
-            borderColor: '#9ca3af', // gray-400
-          },
+            ...provided,
+            padding: '0.5rem',
+            borderColor: state.isFocused ? '#d1d5db' : '#d1d5db', // gray-300
+            borderRadius: '0.75rem', // rounded-xl
+            boxShadow: 'none',
+            '&:hover': {
+                borderColor: '#9ca3af', // gray-400
+            },
         }),
         input: (provided) => ({
-          ...provided,
-          color: '#374151', // gray-700
+            ...provided,
+            color: '#374151', // gray-700
         }),
         option: (provided, state) => ({
-          ...provided,
-          backgroundColor: state.isSelected ? '#3b82f6' : 'white', // blue-500 when selected
-          color: state.isSelected ? 'white' : '#374151', // gray-700
-          '&:hover': {
-            backgroundColor: '#e5e7eb', // gray-200
-          },
+            ...provided,
+            backgroundColor: state.isSelected ? '#3b82f6' : 'white', // blue-500 when selected
+            color: state.isSelected ? 'white' : '#374151', // gray-700
+            '&:hover': {
+                backgroundColor: '#e5e7eb', // gray-200
+            },
         }),
         singleValue: (provided) => ({
-          ...provided,
-          color: '#374151', // gray-700
+            ...provided,
+            color: '#374151', // gray-700
         }),
-      };
+    };
 
-      useEffect(() => {
+    useEffect(() => {
         if (coupon) {
             let descuento = 0;
             if (coupon.type === 'percentage') {
@@ -1326,11 +1326,11 @@ export default function ShippingStepSF({
             }
             setDescuentoFinal(descuento);
         } else {
-            setDescuentoFinal(0); 
+            setDescuentoFinal(0);
         }
-    }, [totalPrice, coupon]); 
+    }, [totalPrice, coupon]);
 
-    
+
     const onCouponApply = (e) => {
         e.preventDefault();
         const coupon = (couponRef.current.value || "").trim().toUpperCase();
@@ -1361,7 +1361,7 @@ export default function ShippingStepSF({
                     setDescuentoFinal(0);
                 }
             });
-            
+
     };
 
     const onCouponKeyDown = (e) => {
@@ -1392,7 +1392,7 @@ export default function ShippingStepSF({
                     overflow-y: auto;
                 }
             `}</style>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-y-8 lg:gap-8 ">
                 <div className="lg:col-span-3">
                     {/* Formulario */}
@@ -1406,7 +1406,7 @@ export default function ShippingStepSF({
                             </h3>
                             <div className="grid lg:grid-cols-2 gap-4">
                                 {/* Nombres */}
-                            
+
                                 <InputForm
                                     type="text"
                                     label="Nombres"
@@ -1429,9 +1429,9 @@ export default function ShippingStepSF({
                                     required
                                 />
                             </div>
-                    
+
                             <div className="grid lg:grid-cols-2 gap-4 ">
-                            
+
                                 {/* Correo electrónico */}
                                 <InputForm
                                     label="Correo electrónico"
@@ -1475,7 +1475,7 @@ export default function ShippingStepSF({
                                                     // Buscar el país en el array de prefijos para obtener el código ISO
                                                     const prefix = prefixes.find(p => p.country === country);
                                                     const countryCode = prefix?.isoCode?.ISO1?.toLowerCase() || country.toLowerCase().substring(0, 2);
-                                                    
+
                                                     // Lista de servicios de banderas ordenados por prioridad
                                                     const flagServices = [
                                                         `https://flagsapi.com/${countryCode.toUpperCase()}/flat/24.png`,
@@ -1484,9 +1484,9 @@ export default function ShippingStepSF({
                                                         `https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/${countryCode}.svg`,
                                                         `https://raw.githubusercontent.com/lipis/flag-icons/main/flags/4x3/${countryCode}.svg`
                                                     ];
-                                                    
+
                                                     let currentIndex = 0;
-                                                    
+
                                                     const handleImageError = (e) => {
                                                         currentIndex++;
                                                         if (currentIndex < flagServices.length) {
@@ -1500,10 +1500,10 @@ export default function ShippingStepSF({
                                                             }
                                                         }
                                                     };
-                                                    
+
                                                     return (
                                                         <div className="flex items-center gap-2">
-                                                            <img 
+                                                            <img
                                                                 src={flagServices[0]}
                                                                 alt={`Bandera de ${country}`}
                                                                 className="w-6 h-4 object-cover rounded-sm flex-shrink-0 border border-gray-200"
@@ -1514,7 +1514,7 @@ export default function ShippingStepSF({
                                                                 <span className="text-xs text-gray-500">{countryCode.toUpperCase()}</span>
                                                             </div>
                                                             <span className="font-medium text-sm">{code}</span>
-                                                          
+
                                                         </div>
                                                     );
                                                 }}
@@ -1529,7 +1529,7 @@ export default function ShippingStepSF({
                                                         borderRadius: '0.75rem',
                                                         fontSize: '14px',
                                                         '&:hover': { borderColor: '#9ca3af' },
-                                                        '&:focus-within': { 
+                                                        '&:focus-within': {
                                                             borderColor: '#3b82f6',
                                                             boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.1)'
                                                         }
@@ -1553,7 +1553,7 @@ export default function ShippingStepSF({
                                                 }}
                                                 filterOption={(option, inputValue) => {
                                                     return option.data.country.toLowerCase().includes(inputValue.toLowerCase()) ||
-                                                           option.data.code.toLowerCase().includes(inputValue.toLowerCase());
+                                                        option.data.code.toLowerCase().includes(inputValue.toLowerCase());
                                                 }}
                                             />
                                         </div>
@@ -1574,10 +1574,10 @@ export default function ShippingStepSF({
                             </div>
                         </div>
 
-                        <div className="bg-[#66483966] py-[0.6px]"></div>    
+                        <div className="bg-[#66483966] py-[0.6px]"></div>
 
                         <div className="sectionDelivery space-y-3.5">
-                            
+
                             <h3 className={`block text-xl 2xl:text-2xl font-bold mb-4 customtext-neutral-dark`}>
                                 Dirección de envío
                             </h3>
@@ -1618,24 +1618,24 @@ export default function ShippingStepSF({
                                     menuPortalTarget={document.body}
                                     isClearable={true}
                                     components={{
-                                    ClearIndicator: (props) => (
-                                        <div {...props.innerProps} className="p-1 cursor-pointer">
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className="h-5 w-5 text-red-400 hover:text-red-600"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M6 18L18 6M6 6l12 12"
-                                            />
-                                        </svg>
-                                        </div>
-                                    ),
+                                        ClearIndicator: (props) => (
+                                            <div {...props.innerProps} className="p-1 cursor-pointer">
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="h-5 w-5 text-red-400 hover:text-red-600"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M6 18L18 6M6 6l12 12"
+                                                    />
+                                                </svg>
+                                            </div>
+                                        ),
                                     }}
                                 />
                                 {errors.ubigeo && <div className="text-red-500 text-sm mt-1">{errors.ubigeo}</div>}
@@ -1730,7 +1730,7 @@ export default function ShippingStepSF({
                                 onChange={handleChange}
                                 placeholder="Ejem. Altura de la avenida..."
                             /> */}
-                        
+
                             {shippingOptions.length > 0 && (
                                 <div className="space-y-4">
                                     <h3 className="block text-xl 2xl:text-2xl font-bold mb-4 customtext-neutral-dark">
@@ -1744,10 +1744,10 @@ export default function ShippingStepSF({
                                                     option.type === "free"
                                                         ? option.deliveryType
                                                         : option.type === "express"
-                                                        ? option.deliveryType
-                                                        : option.type === "agency"
-                                                        ? option.deliveryType
-                                                        : option.deliveryType
+                                                            ? option.deliveryType
+                                                            : option.type === "agency"
+                                                                ? option.deliveryType
+                                                                : option.deliveryType
                                                 }
                                                 price={option.price}
                                                 description={option.description}
@@ -1813,7 +1813,7 @@ export default function ShippingStepSF({
                             )}
                         </div>
 
-                        <div className="bg-[#66483966] py-[0.6px]"></div>      
+                        <div className="bg-[#66483966] py-[0.6px]"></div>
 
                         {/* Tipo de comprobante */}
                         <div className="space-y-2">
@@ -1831,11 +1831,10 @@ export default function ShippingStepSF({
                                             checked={formData.invoiceType === "boleta"}
                                             onChange={handleChange}
                                         />
-                                        <div className={`w-5 h-5 border-2 rounded-full transition-all duration-200 ${
-                                            formData.invoiceType === "boleta" 
-                                                ? 'border-primary bg-primary' 
-                                                : 'border-gray-300 bg-white group-hover:border-gray-400'
-                                        }`}>
+                                        <div className={`w-5 h-5 border-2 rounded-full transition-all duration-200 ${formData.invoiceType === "boleta"
+                                            ? 'border-primary bg-primary'
+                                            : 'border-gray-300 bg-white group-hover:border-gray-400'
+                                            }`}>
                                             {formData.invoiceType === "boleta" && (
                                                 <div className="w-2 h-2 bg-white rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
                                             )}
@@ -1853,11 +1852,10 @@ export default function ShippingStepSF({
                                             checked={formData.invoiceType === "factura"}
                                             onChange={handleChange}
                                         />
-                                        <div className={`w-5 h-5 border-2 rounded-full transition-all duration-200 ${
-                                            formData.invoiceType === "factura" 
-                                                ? 'border-primary bg-primary' 
-                                                : 'border-gray-300 bg-white group-hover:border-gray-400'
-                                        }`}>
+                                        <div className={`w-5 h-5 border-2 rounded-full transition-all duration-200 ${formData.invoiceType === "factura"
+                                            ? 'border-primary bg-primary'
+                                            : 'border-gray-300 bg-white group-hover:border-gray-400'
+                                            }`}>
                                             {formData.invoiceType === "factura" && (
                                                 <div className="w-2 h-2 bg-white rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
                                             )}
@@ -1870,17 +1868,17 @@ export default function ShippingStepSF({
 
                         {/* Documento */}
                         <InputForm
-                                label={formData.documentType === "dni" ? "DNI" : "RUC"}
-                                type="text"
-                                name="document"
-                                value={formData.document}
-                                error={errors.document}
-                                onChange={handleChange}
-                                placeholder={`Ingrese su ${formData.documentType === "dni" ? "DNI" : "RUC"}`}
-                                maxLength={formData.documentType === "dni" ? "8" : "11"}
-                                required
+                            label={formData.documentType === "dni" ? "DNI" : "RUC"}
+                            type="text"
+                            name="document"
+                            value={formData.document}
+                            error={errors.document}
+                            onChange={handleChange}
+                            placeholder={`Ingrese su ${formData.documentType === "dni" ? "DNI" : "RUC"}`}
+                            maxLength={formData.documentType === "dni" ? "8" : "11"}
+                            required
                         />
-                        
+
                         {/* Razón Social (solo para factura) */}
                         {formData.invoiceType === "factura" && (
                             <InputForm
@@ -1891,7 +1889,7 @@ export default function ShippingStepSF({
                                 onChange={handleChange}
                                 placeholder="Ingrese la razón social"
                             />
-                        )}    
+                        )}
 
                     </form>
                 </div>
@@ -1915,7 +1913,7 @@ export default function ShippingStepSF({
                                             {item.name}
                                         </h3>
 
-                                    
+
                                         <p className="text-sm customtext-neutral-light">
                                             Cantidad:{" "}
                                             <span className="customtext-neutral-dark">
@@ -1936,9 +1934,8 @@ export default function ShippingStepSF({
                                     <input
                                         type="text"
                                         placeholder="Código de cupón"
-                                        className={`w-full rounded-l-md border py-3 px-4 text-sm outline-none uppercase focus:border-[#C5B8D4] ${
-                                            couponError ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full rounded-l-md border py-3 px-4 text-sm outline-none uppercase focus:border-[#C5B8D4] ${couponError ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         value={couponCode}
                                         onChange={(e) => {
                                             setCouponCode(e.target.value);
@@ -1953,11 +1950,10 @@ export default function ShippingStepSF({
                                         disabled={couponLoading}
                                     />
                                     <button
-                                        className={`rounded-r-md px-4 py-2 text-sm text-white transition-all duration-300 hover:opacity-90 ${
-                                            couponLoading 
-                                                ? 'bg-gray-400 cursor-not-allowed' 
-                                                : data?.gradient ? 'bg-gradient' : 'bg-primary'
-                                        }`}
+                                        className={`rounded-r-md px-4 py-2 text-sm text-white transition-all duration-300 hover:opacity-90 ${couponLoading
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : data?.gradient ? 'bg-gradient' : 'bg-primary'
+                                            }`}
                                         type="button"
                                         onClick={validateCoupon}
                                         disabled={couponLoading}
@@ -1965,7 +1961,7 @@ export default function ShippingStepSF({
                                         {couponLoading ? "..." : "Aplicar"}
                                     </button>
                                 </div>
-                              
+
                             </div>
                         ) : (
                             <div className="bg-secondary border  rounded-lg p-4">
@@ -1980,9 +1976,9 @@ export default function ShippingStepSF({
                                             <p className="text-sm font-medium customtext-neutral-dark   ">
                                                 Cupón aplicado: {appliedCoupon.code}
                                             </p>
-                                          
+
                                             <p className="text-xs customtext-neutral-light">
-                                                Descuento: {appliedCoupon.type === 'percentage' 
+                                                Descuento: {appliedCoupon.type === 'percentage'
                                                     ? `${appliedCoupon.value}%`
                                                     : `S/ ${Number2Currency(appliedCoupon.value)}`}
                                             </p>
@@ -1993,7 +1989,7 @@ export default function ShippingStepSF({
                                         className="text-red-600 hover:text-red-700 transition-colors"
                                         title="Remover cupón"
                                     >
-                                      <XCircle/>
+                                        <XCircle />
                                     </button>
                                 </div>
                             </div>
@@ -2004,9 +2000,9 @@ export default function ShippingStepSF({
                         <div className="mt-2 text-red-500 text-sm">{couponError}</div>
                     )}
 
-              
 
-                 
+
+
 
                     <div className="space-y-4 mt-6">
                         <div className="flex justify-between">
@@ -2023,7 +2019,7 @@ export default function ShippingStepSF({
                                 S/ {Number2Currency(igv)}
                             </span>
                         </div>
-                        
+
                         {/* Mostrar descuentos automáticos en el resumen */}
                         {autoDiscountTotal > 0 && (
                             <div className="flex justify-between text-green-600">
@@ -2033,7 +2029,7 @@ export default function ShippingStepSF({
                                 </span>
                             </div>
                         )}
-                        
+
                         {appliedCoupon && (
                             <div className="flex justify-between text-blue-600">
                                 <span>Descuento cupón ({appliedCoupon.code})</span>
@@ -2060,7 +2056,7 @@ export default function ShippingStepSF({
                         </div>
                         <div className="space-y-2 pt-4">
                             <button
-                                className={`w-full py-3 px-6 rounded-full font-semibold text-lg transition-all duration-300 hover:opacity-90 bg-primary ${data?.class_button ||' text-white'}`}
+                                className={`w-full py-3 px-6 rounded-full font-semibold text-lg transition-all duration-300 hover:opacity-90 bg-primary ${data?.class_button || ' text-white'}`}
                                 onClick={handleContinueClick}
                             >
                                 Continuar
@@ -2072,10 +2068,10 @@ export default function ShippingStepSF({
                         </div>
                         <div>
                             <p className="text-sm customtext-neutral-dark">
-                                Al realizar tu pedido, aceptas los 
+                                Al realizar tu pedido, aceptas los
                                 <a href="#" onClick={() => openModal && openModal(1)} className="customtext-primary font-bold"> Términos y Condiciones</a>
                                 , y que nosotros usaremos sus datos personales de
-                                acuerdo con nuestra 
+                                acuerdo con nuestra
                                 <a href="#" onClick={() => openModal && openModal(0)} className="customtext-primary font-bold"> Política de Privacidad</a>
                                 .
                             </p>
@@ -2089,7 +2085,7 @@ export default function ShippingStepSF({
                 contacts={contacts}
                 onClose={() => setShowPaymentModal(false)}
                 onPaymentComplete={handlePaymentComplete}
-                
+
             />
 
             <UploadVoucherModalYape

@@ -49,14 +49,14 @@ const Sales = ({ statuses = [] }) => {
             }
         `;
         document.head.appendChild(style);
-        
+
         return () => {
             document.head.removeChild(style);
         };
     }, []);
 
     const onStatusChange = async (e, sale) => {
-        console.log({sale, saleLoaded})
+        console.log({ sale, saleLoaded })
         const status = statuses.find((s) => s.id == e.target.value)
         if (status.reversible == 0) {
             const { isConfirmed } = await Swal.fire({
@@ -76,10 +76,10 @@ const Sales = ({ statuses = [] }) => {
         });
         setStatusLoading(false)
         if (!result) return;
-        
+
         const newSale = await salesRest.get(sale.id);
         setSaleLoaded(newSale.data);
-        
+
         // Cargar el historial de estados usando la nueva API
         const statusHistory = await saleStatusesRest.bySale(sale.id);
         if (statusHistory) {
@@ -87,7 +87,7 @@ const Sales = ({ statuses = [] }) => {
         } else {
             setSaleStatuses([]);
         }
-        
+
         $(gridRef.current).dxDataGrid("instance").refresh();
     };
 
@@ -114,7 +114,7 @@ const Sales = ({ statuses = [] }) => {
         console.log("Status reversible:", newSale.data.status?.reversible); // Debug: ver reversible
         console.log("All statuses:", statuses); // Debug: ver todos los estados disponibles
         setSaleLoaded(newSale.data);
-        
+
         // Cargar el historial de estados usando la nueva API
         const statusHistory = await saleStatusesRest.bySale(saleId);
         if (statusHistory) {
@@ -122,7 +122,7 @@ const Sales = ({ statuses = [] }) => {
         } else {
             setSaleStatuses([]);
         }
-        
+
         $(modalRef.current).modal("show");
     };
 
@@ -261,7 +261,7 @@ const Sales = ({ statuses = [] }) => {
             }
 
             const data = await response.json();
-            
+
             if (!data.success) {
                 throw new Error(data.message || 'Error al obtener los datos');
             }
@@ -361,7 +361,7 @@ const Sales = ({ statuses = [] }) => {
             ];
 
             worksheet['!cols'] = columnWidths;
-            
+
             // Agregar hoja al libro
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Ventas_Facturacion');
 
@@ -519,18 +519,18 @@ const Sales = ({ statuses = [] }) => {
     useEffect(() => {
         if (!saleLoaded) return
         saleStatusesRest.bySale(saleLoaded.id).then((data) => {
-          if (data) setSaleStatuses(data)
-          else setSaleStatuses([])
+            if (data) setSaleStatuses(data)
+            else setSaleStatuses([])
         })
     }, [saleLoaded]);
 
     const statusTemplate = (e) => {
         const data = $(e.element).data('status')
         if (!e.id) return
-        
+
         const baseColor = data?.color || "#333";
         const element = $(renderToString(
-            <span 
+            <span
                 title={data?.description || ''}
                 className="d-flex align-items-center"
                 style={{
@@ -540,9 +540,9 @@ const Sales = ({ statuses = [] }) => {
                     fontWeight: "500"
                 }}
             >
-                <i 
+                <i
                     className={`${data?.icon || 'mdi mdi-circle'} me-2`}
-                    style={{ 
+                    style={{
                         color: baseColor,
                         fontSize: "12px"
                     }}
@@ -550,16 +550,28 @@ const Sales = ({ statuses = [] }) => {
                 {e.text}
             </span>
         ));
-        
+
         return element;
     }
 
     const subtotalReal = saleLoaded?.details?.reduce((sum, detail) => sum + (detail.price * detail.quantity), 0) || 0;
-    const totalAmount = subtotalReal + Number(saleLoaded?.delivery || 0) - 
-        Number(saleLoaded?.promotion_discount || 0) - 
-        Number(saleLoaded?.coupon_discount || 0) - 
-        Number(saleLoaded?.bundle_discount || 0) - 
+
+    // El subtotalReal ya incluye IGV, necesitamos extraer el subtotal sin IGV
+    const subtotalWithoutIGV = parseFloat((subtotalReal / 1.18).toFixed(2));
+
+    // Calcular subtotal sin IGV después de descuentos
+    const totalDiscounts = Number(saleLoaded?.promotion_discount || 0) +
+        Number(saleLoaded?.coupon_discount || 0) +
+        Number(saleLoaded?.bundle_discount || 0) +
         Number(saleLoaded?.renewal_discount || 0);
+
+    const subtotalAfterDiscounts = Math.max(0, subtotalWithoutIGV - totalDiscounts);
+
+    // Calcular IGV (18% sobre subtotal después de descuentos)
+    const igvAmount = parseFloat((subtotalAfterDiscounts * 0.18).toFixed(2));
+
+    // Calcular total final: subtotal después de descuentos + IGV + envío
+    const totalAmount = parseFloat((subtotalAfterDiscounts + igvAmount + Number(saleLoaded?.delivery || 0)).toFixed(2));
 
     return (
         <>
@@ -661,13 +673,13 @@ const Sales = ({ statuses = [] }) => {
                             );
                         },
                     },
-              
+
                     {
                         dataField: "amount",
                         caption: "Total",
                         dataType: "number",
                         cellTemplate: (container, { data }) => {
-                           
+
                             container.text(`S/. ${Number2Currency(data?.amount)}`);
                         },
                     },
@@ -752,18 +764,18 @@ const Sales = ({ statuses = [] }) => {
                                                 <td>{saleLoaded?.document}</td>
                                             </tr>
                                         )}
-                                        
+
                                         {saleLoaded?.delivery_type && (
                                             <tr>
                                                 <th>Tipo de entrega:</th>
                                                 <td>
                                                     <span className="badge bg-info">
-                                                        {saleLoaded?.delivery_type === 'store_pickup' ? 'Retiro en Tienda' : 
-                                                         saleLoaded?.delivery_type === 'free' ? 'Envío Gratis' : 
-                                                         saleLoaded?.delivery_type === 'express' ? 'Envío Express' : 
-                                                         saleLoaded?.delivery_type === 'standard' ? 'Envío Estándar' :
-                                                         saleLoaded?.delivery_type === 'agency' ? 'Entrega en Agencia' : 
-                                                         saleLoaded?.delivery_type}
+                                                        {saleLoaded?.delivery_type === 'store_pickup' ? 'Retiro en Tienda' :
+                                                            saleLoaded?.delivery_type === 'free' ? 'Envío Gratis' :
+                                                                saleLoaded?.delivery_type === 'express' ? 'Envío Express' :
+                                                                    saleLoaded?.delivery_type === 'standard' ? 'Envío Estándar' :
+                                                                        saleLoaded?.delivery_type === 'agency' ? 'Entrega en Agencia' :
+                                                                            saleLoaded?.delivery_type}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -856,10 +868,10 @@ const Sales = ({ statuses = [] }) => {
                                                 <td>
                                                     {saleLoaded?.applied_promotions && (() => {
                                                         try {
-                                                            const promotions = typeof saleLoaded.applied_promotions === 'string' 
-                                                                ? JSON.parse(saleLoaded.applied_promotions) 
+                                                            const promotions = typeof saleLoaded.applied_promotions === 'string'
+                                                                ? JSON.parse(saleLoaded.applied_promotions)
                                                                 : saleLoaded.applied_promotions;
-                                                            
+
                                                             if (Array.isArray(promotions) && promotions.length > 0) {
                                                                 return promotions.map((promo, index) => (
                                                                     <div key={index} className="mb-2">
@@ -885,7 +897,7 @@ const Sales = ({ statuses = [] }) => {
                                                             return null;
                                                         }
                                                     })()}
-                                                    
+
                                                     {saleLoaded?.promotion_discount > 0 && (
                                                         <div className="mt-2 pt-2 border-top">
                                                             <strong className="text-primary">
@@ -1011,7 +1023,7 @@ const Sales = ({ statuses = [] }) => {
                                                                 // Buscar project_id en colors (para álbumes personalizados)
                                                                 let projectId = null;
                                                                 let colorData = null;
-                                                                
+
                                                                 if (detail.colors) {
                                                                     try {
                                                                         // Si colors es JSON, parsearlo
@@ -1053,7 +1065,7 @@ const Sales = ({ statuses = [] }) => {
                                                                             onClick={(e) => {
                                                                                 e.preventDefault();
                                                                                 console.log("🔗 Intentando abrir PDF personalizado:", projectId);
-                                                                                
+
                                                                                 // Verificar si el archivo del proyecto existe
                                                                                 const checkUrl = `/storage/images/pdf/${projectId}/${projectId}.pdf`;
                                                                                 fetch(checkUrl, { method: 'HEAD' })
@@ -1216,9 +1228,14 @@ const Sales = ({ statuses = [] }) => {
                                     <b>Subtotal:</b>
                                     <span>
                                         S/{" "}
-                                        {Number2Currency(
-                                            saleLoaded?.details?.reduce((sum, detail) => sum + (detail.price * detail.quantity), 0) || 0
-                                        )}
+                                        {Number2Currency(subtotalWithoutIGV)}
+                                    </span>
+                                </div>
+                                <div className="d-flex justify-content-between">
+                                    <b>IGV:</b>
+                                    <span>
+                                        S/{" "}
+                                        {Number2Currency(igvAmount)}
                                     </span>
                                 </div>
                                 <div className="d-flex justify-content-between">
@@ -1228,7 +1245,7 @@ const Sales = ({ statuses = [] }) => {
                                         {Number2Currency(saleLoaded?.delivery)}
                                     </span>
                                 </div>
-                                
+
                                 {/* Mostrar descuentos automáticos en el resumen */}
                                 {saleLoaded?.promotion_discount > 0 && (
                                     <div className="d-flex justify-content-between text-primary">
@@ -1239,7 +1256,7 @@ const Sales = ({ statuses = [] }) => {
                                         </span>
                                     </div>
                                 )}
-                                
+
                                 {saleLoaded?.coupon_discount > 0 && (
                                     <div className="d-flex justify-content-between text-success">
                                         <b>Descuento por cupón:</b>
@@ -1249,7 +1266,7 @@ const Sales = ({ statuses = [] }) => {
                                         </span>
                                     </div>
                                 )}
-                                
+
                                 {/* Mostrar otros descuentos si existen */}
                                 {saleLoaded?.bundle_discount > 0 && (
                                     <div className="d-flex justify-content-between text-info">
@@ -1260,7 +1277,7 @@ const Sales = ({ statuses = [] }) => {
                                         </span>
                                     </div>
                                 )}
-                                
+
                                 {saleLoaded?.renewal_discount > 0 && (
                                     <div className="d-flex justify-content-between text-warning">
                                         <b>Descuento por renovación:</b>
@@ -1270,7 +1287,7 @@ const Sales = ({ statuses = [] }) => {
                                         </span>
                                     </div>
                                 )}
-                                
+
                                 <hr className="my-2" />
                                 <div className="d-flex justify-content-between">
                                     <b>Total:</b>
@@ -1280,17 +1297,23 @@ const Sales = ({ statuses = [] }) => {
                                         </strong>
                                     </span>
                                 </div>
-                                
+
                                 {/* Mostrar desglose de cómo se calculó el total */}
                                 <small className="text-muted mt-2 d-block">
-                                    <strong>Cálculo:</strong> 
-                                    {Number2Currency(subtotalReal)} (subtotal)
+                                    <strong>Cálculo:</strong>
+                                    {Number2Currency(subtotalAfterDiscounts)} (subtotal después de descuentos)
+                                    + {Number2Currency(igvAmount)} (IGV 18%)
                                     + {Number2Currency(saleLoaded?.delivery)} (envío)
+                                    = S/ {Number2Currency(totalAmount)}
+                                </small>
+                                <small className="text-muted d-block">
+                                    <strong>Desglose:</strong> S/ {Number2Currency(subtotalReal)} (productos con IGV)
+                                    → S/ {Number2Currency(subtotalWithoutIGV)} (subtotal sin IGV)
                                     {saleLoaded?.promotion_discount > 0 && ` - ${Number2Currency(saleLoaded?.promotion_discount)} (promociones)`}
                                     {saleLoaded?.coupon_discount > 0 && ` - ${Number2Currency(saleLoaded?.coupon_discount)} (cupón)`}
                                     {saleLoaded?.bundle_discount > 0 && ` - ${Number2Currency(saleLoaded?.bundle_discount)} (paquete)`}
                                     {saleLoaded?.renewal_discount > 0 && ` - ${Number2Currency(saleLoaded?.renewal_discount)} (renovación)`}
-                                    = S/ {Number2Currency(totalAmount)}
+                                    → S/ {Number2Currency(subtotalAfterDiscounts)} (subtotal final)
                                 </small>
                             </div>
                         </div>
@@ -1316,15 +1339,15 @@ const Sales = ({ statuses = [] }) => {
                                     </div>
                                 )}
                                 <div>
-                                <SelectFormGroup label='Estado actual' dropdownParent='#statusSelectContainer' minimumResultsForSearch={-1} templateResult={statusTemplate} templateSelection={statusTemplate} onChange={(e) => onStatusChange(e, saleLoaded)} value={saleLoaded?.status_id} changeWith={[saleLoaded]} disabled={statusLoading || saleLoaded?.status?.reversible == 0}>
-                                    {statuses.map((status, index) => {
-                                        return (
-                                            <option key={index} value={status.id} data-status={JSON.stringify(status)}>
-                                                {status.name}
-                                            </option>
-                                        );
-                                    })}
-                                </SelectFormGroup>
+                                    <SelectFormGroup label='Estado actual' dropdownParent='#statusSelectContainer' minimumResultsForSearch={-1} templateResult={statusTemplate} templateSelection={statusTemplate} onChange={(e) => onStatusChange(e, saleLoaded)} value={saleLoaded?.status_id} changeWith={[saleLoaded]} disabled={statusLoading || saleLoaded?.status?.reversible == 0}>
+                                        {statuses.map((status, index) => {
+                                            return (
+                                                <option key={index} value={status.id} data-status={JSON.stringify(status)}>
+                                                    {status.name}
+                                                </option>
+                                            );
+                                        })}
+                                    </SelectFormGroup>
                                 </div>
                                 {/* <div className="mb-2">
                                     <label
@@ -1383,7 +1406,7 @@ const Sales = ({ statuses = [] }) => {
                                     // Buscar el color del estado desde la lista de estados disponibles
                                     const statusData = statuses.find(s => s.id === ss.status_id || s.name === ss.name);
                                     const statusColor = statusData?.color || ss.color || "#333";
-                                    
+
                                     return (
                                         <article
                                             key={index}

@@ -76,16 +76,24 @@ export default function ConfirmationStepSF({
         return acc + (itemPrice * quantity);
     }, 0) || 0;
 
-    // Replicar exactamente la lógica de ConfirmationStep.jsx
-    const subTotal = parseFloat((totalPrice / 1.18).toFixed(2));
-    const igv = parseFloat((totalPrice - subTotal).toFixed(2));
+    // Calcular subtotal sin IGV del precio total original
+    const subTotalOriginal = parseFloat((totalPrice / 1.18).toFixed(2));
     const deliveryCost = parseFloat(order.delivery || 0);
     const couponDiscountAmount = parseFloat(order.coupon_discount || 0);
     const automaticDiscount = parseFloat(order.automatic_discount_total || 0);
     
-    // Calcular igual que en ConfirmationStep.jsx
-    const totalBeforeDiscount = parseFloat(subTotal) + parseFloat(igv) + deliveryCost;
-    const totalFinal = totalBeforeDiscount - couponDiscountAmount - automaticDiscount;
+    // Calcular subtotal después de descuentos
+    const totalAllDiscounts = couponDiscountAmount + automaticDiscount;
+    const subTotalAfterDiscounts = Math.max(0, subTotalOriginal - totalAllDiscounts);
+    
+    // Calcular IGV sobre el subtotal después de descuentos (18%)
+    const igv = parseFloat((subTotalAfterDiscounts * 0.18).toFixed(2));
+    
+    // El subtotal que se muestra es el original para efectos de visualización
+    const subTotal = subTotalOriginal;
+    
+    // Calcular total final
+    const totalFinal = subTotalAfterDiscounts + igv + deliveryCost;
     console.log(order.delivery, "order.coupon_discount");
     return (
         <div className="mx-auto">

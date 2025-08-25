@@ -55,7 +55,7 @@ class MercadoPagoController extends Controller
                 'number' => $request->number,
                 'reference' => $request->reference,
                 'comment' => $request->comment,
-                'amount' => $request->amount + $request->delivery - $discountAmount,
+                'amount' => $request->amount, // El frontend ya envía el total final correcto
                 'delivery' => $request->delivery,
                 'payment_status' => 'pendiente',
                 'status_id' => $saleStatusPendiente ? $saleStatusPendiente->id : null,
@@ -66,7 +66,7 @@ class MercadoPagoController extends Controller
                 'payment_method' => $request->payment_method,
                 'coupon_id' => $request->coupon_id != 'null' ? $request->coupon_id : null,
                 'coupon_discount' => $discountAmount,
-                'total_amount' => $request->amount + $request->delivery - $discountAmount,
+                'total_amount' => $request->amount, // El frontend ya envía el total final correcto
             ]);
            
              // Registrar detalles de la venta (sin afectar stock aún)

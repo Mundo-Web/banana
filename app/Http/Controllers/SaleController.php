@@ -32,29 +32,31 @@ class SaleController extends BasicController
     /**
      * Limpiar número de teléfono removiendo el prefijo si está presente
      */
-    private static function cleanPhoneNumber($phoneNumber, $prefix = '51') {
+    private static function cleanPhoneNumber($phoneNumber, $prefix = '51')
+    {
         if (empty($phoneNumber)) {
             return $phoneNumber;
         }
-        
+
         // Convertir a string y remover espacios
         $phone = trim((string)$phoneNumber);
         $cleanPrefix = trim((string)$prefix);
-        
+
         // Si el número empieza con el prefijo, removerlo
         if (strpos($phone, $cleanPrefix) === 0) {
             $phone = substr($phone, strlen($cleanPrefix));
         }
-        
+
         return $phone;
     }
 
-    public function track(Request $request, string $code) {
+    public function track(Request $request, string $code)
+    {
         $response = Response::simpleTryCatch(function () use ($code) {
             $sale = Sale::select(['id', 'code', 'status_id', 'updated_at'])
-            ->with(['status', 'tracking'])
-            ->where('code', $code)
-            ->first();
+                ->with(['status', 'tracking'])
+                ->where('code', $code)
+                ->first();
             if (!$sale) throw new Exception('El código de seguimiento no es válido');
             return $sale->toArray();
         });
@@ -105,13 +107,13 @@ class SaleController extends BasicController
             $saleJpa->number = $sale['number'];
             $saleJpa->reference = $sale['reference'];
             $saleJpa->comment = $sale['comment'];
-            
+
             // Document info - Compatible con PaymentController
             $saleJpa->documentType = $sale['document_type'] ?? $sale['documentType'] ?? null;
             $saleJpa->document = $sale['document'] ?? null;
             $saleJpa->invoiceType = $sale['invoiceType'] ?? null;
             $saleJpa->businessName = $sale['businessName'] ?? null;
-            
+
             // Campos adicionales de PaymentController
             $saleJpa->delivery_type = $sale['delivery_type'] ?? null;
             $saleJpa->store_id = $sale['store_id'] ?? null;
@@ -190,7 +192,7 @@ class SaleController extends BasicController
                 } else {
                     $saleJpa->coupon_discount = $couponJpa->value;
                 }
-                
+
                 // Incrementar el contador de uso del cupón
                 $couponJpa->incrementUsage();
             }
@@ -201,7 +203,7 @@ class SaleController extends BasicController
                     ? $sale['applied_promotions']
                     : json_encode($sale['applied_promotions']);
             }
-            
+
             if (isset($sale['promotion_discount']) && $sale['promotion_discount'] > 0) {
                 $saleJpa->promotion_discount = $sale['promotion_discount'];
             }
@@ -212,7 +214,7 @@ class SaleController extends BasicController
                     ? $sale['automatic_discounts']
                     : json_encode($sale['automatic_discounts']);
             }
-            
+
             if (isset($sale['automatic_discount_total']) && $sale['automatic_discount_total'] > 0) {
                 $saleJpa->promotion_discount = $sale['automatic_discount_total'];
             }
@@ -307,7 +309,7 @@ class SaleController extends BasicController
         // $body['status_id'] = 'e13a417d-a2f0-4f5f-93d8-462d57f13d3c';
         $body['status_id'] = 'bd60fc99-c0c0-463d-b738-1c72d7b085f5';
         $body['user_id'] = Auth::id();
-        
+
         // Campos adicionales que maneja PaymentController con valores por defecto
         $body['fullname'] = $request->fullname ?? (($request->name ?? '') . ' ' . ($request->lastname ?? ''));
         $body['delivery_type'] = $request->delivery_type ?? 'domicilio'; // Valor por defecto
@@ -315,7 +317,7 @@ class SaleController extends BasicController
         $body['payment_status'] = $request->payment_status ?? 'pendiente';
         $body['invoiceType'] = $request->invoiceType ?? 'boleta'; // Valor por defecto
         $body['businessName'] = $request->businessName ?? null;
-        
+
         // Document info (compatible con PaymentController)
         $body['documentType'] = $request->document_type ?? $request->documentType ?? null;
         $body['document'] = $request->document ?? null;
@@ -327,7 +329,7 @@ class SaleController extends BasicController
                 $body['coupon_id'] = $couponJpa->id;
                 $body['coupon_code'] = $couponJpa->code;
                 $body['coupon_discount'] = $couponJpa->calculateDiscount($tempTotal);
-                
+
                 // Incrementar el contador de uso del cupón
                 $couponJpa->incrementUsage();
             }
@@ -339,18 +341,18 @@ class SaleController extends BasicController
                 ? $body['applied_promotions']
                 : json_encode($body['applied_promotions']);
         }
-        
+
         if (isset($body['promotion_discount'])) {
             $body['promotion_discount'] = $body['promotion_discount'] ?? 0;
         }
 
         // Compatibilidad con nombres alternativos para descuentos automáticos
         if (isset($body['automatic_discounts']) && $body['automatic_discounts']) {
-            $body['applied_promotions'] = is_string($body['automatic_discounts']) 
-                ? $body['automatic_discounts'] 
+            $body['applied_promotions'] = is_string($body['automatic_discounts'])
+                ? $body['automatic_discounts']
                 : json_encode($body['automatic_discounts']);
         }
-        
+
         if (isset($body['automatic_discount_total'])) {
             $body['promotion_discount'] = $body['automatic_discount_total'] ?? 0;
         }
@@ -383,15 +385,15 @@ class SaleController extends BasicController
     {
         $totalPrice = 0;
         $details = JSON::parse($request->details);
-        
+
         // DEBUG: Logging detallado
         Log::info("🔍 === PROCESANDO DETAILS EN SaleController::afterSave ===");
         Log::info("📦 Details parsed:", ['details' => $details]);
         Log::info("🔢 Cantidad de items:", ['count' => count($details)]);
-        
+
         foreach ($details as $index => $item) {
             $itemJpa = Item::find($item['id']);
-            
+
             // Debug: Log de los datos del item
             Log::info("🛒 PROCESANDO ITEM #{$index} EN SALECONTROLLER:", [
                 'item_data' => $item,
@@ -401,11 +403,11 @@ class SaleController extends BasicController
                 'canvas_project_id_value' => $item['canvas_project_id'] ?? 'NO_SET',
                 'item_keys' => array_keys($item)
             ]);
-            
+
             // Obtener información del proyecto si existe
             $projectId = $item['project_id'] ?? null;
             $canvasProjectId = $item['canvas_project_id'] ?? null;
-            
+
             // Si es un álbum personalizado, guardar la información del proyecto en colors como JSON
             $colorsData = $itemJpa->color;
             if ($projectId || $canvasProjectId) {
@@ -423,7 +425,7 @@ class SaleController extends BasicController
                     'color' => $itemJpa->color
                 ]);
             }
-            
+
             // Crear detalle de venta con todos los campos como PaymentController
             SaleDetail::create([
                 'sale_id' => $jpa->id,
@@ -434,29 +436,36 @@ class SaleController extends BasicController
                 'colors' => $colorsData,
                 'image' => $itemJpa->image,
             ]);
-            
+
             $totalPrice += $itemJpa->final_price * $item['quantity'];
-            
+
             // Actualizar stock como lo hace PaymentController
             Item::where('id', $itemJpa->id)->decrement('stock', $item['quantity']);
         }
 
-        // Aplicar descuentos de cupones
-        if ($request->coupon_id != 'null' && $request->coupon_discount > 0) {
-            $totalPrice -= $request->coupon_discount ?? 0;
+        // El amount ya viene calculado correctamente desde el frontend con IGV aplicado sobre subtotal después de descuentos
+        // No necesitamos recalcular aquí, solo usar el valor que viene del request
+        if ($request->has('amount') && $request->amount > 0) {
+            $jpa->amount = $request->amount;
+        } else {
+            // Fallback: si no viene amount del frontend, calcular de la forma tradicional
+            // Aplicar descuentos de cupones
+            if ($request->coupon_id != 'null' && $request->coupon_discount > 0) {
+                $totalPrice -= $request->coupon_discount ?? 0;
+            }
+
+            // Aplicar descuentos automáticos/promociones
+            if ($request->has('promotion_discount') && $request->promotion_discount > 0) {
+                $totalPrice -= $request->promotion_discount;
+            }
+
+            // Compatibilidad con nombres alternativos
+            if ($request->has('automatic_discount_total') && $request->automatic_discount_total > 0) {
+                $totalPrice -= $request->automatic_discount_total;
+            }
+
+            $jpa->amount = $totalPrice;
         }
-        
-        // Aplicar descuentos automáticos/promociones
-        if ($request->has('promotion_discount') && $request->promotion_discount > 0) {
-            $totalPrice -= $request->promotion_discount;
-        }
-        
-        // Compatibilidad con nombres alternativos
-        if ($request->has('automatic_discount_total') && $request->automatic_discount_total > 0) {
-            $totalPrice -= $request->automatic_discount_total;
-        }
-        
-        $jpa->amount = $totalPrice;
         $jpa->save();
 
         // Incrementar el contador de uso del cupón si se aplicó uno (como PaymentController)
@@ -470,7 +479,7 @@ class SaleController extends BasicController
         // Enviar notificación de resumen de compra
         $saleJpa = Sale::with('details')->find($jpa->id);
         $details = $saleJpa->details ?? SaleDetail::where('sale_id', $saleJpa->id)->get();
-       //COMENTANDO MAIL
+        //COMENTANDO MAIL
         // $saleJpa->notify(new PurchaseSummaryNotification($saleJpa, $details));
 
         return $jpa;

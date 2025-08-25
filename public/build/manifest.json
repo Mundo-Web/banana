@@ -2546,7 +2546,7 @@
     ]
   },
   "resources/js/Admin/Sales.jsx": {
-    "file": "assets/Sales-D_B_G_LL.js",
+    "file": "assets/Sales-CWYkoUR0.js",
     "name": "Sales",
     "src": "resources/js/Admin/Sales.jsx",
     "isEntry": true,
@@ -5773,7 +5773,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Checkout.jsx": {
-    "file": "assets/Checkout-C1_yj4We.js",
+    "file": "assets/Checkout-Gket8u9L.js",
     "name": "Checkout",
     "src": "resources/js/Components/Tailwind/Checkout.jsx",
     "isDynamicEntry": true,
@@ -5888,7 +5888,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Checkouts/CheckoutStepsSF.jsx": {
-    "file": "assets/CheckoutStepsSF-DsbHXjKi.js",
+    "file": "assets/CheckoutStepsSF-D8F5FNIJ.js",
     "name": "CheckoutStepsSF",
     "src": "resources/js/Components/Tailwind/Checkouts/CheckoutStepsSF.jsx",
     "isDynamicEntry": true,
@@ -10114,7 +10114,7 @@
     ]
   },
   "resources/js/Reutilizables/Businesses/BusinessIWorkCard.jsx": {
-    "file": "assets/BusinessIWorkCard-Ck2W9BBX.js",
+    "file": "assets/BusinessIWorkCard-CHnwbJcZ.js",
     "name": "BusinessIWorkCard",
     "src": "resources/js/Reutilizables/Businesses/BusinessIWorkCard.jsx",
     "isEntry": true,
@@ -10122,10 +10122,9 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BH53Isel.js",
       "_main-6DCdASTx.js",
-      "_BasicRest-C4m6wu80.js",
+      "_index-BZYhE2TF.js",
       "_index-yBjzXJbu.js",
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js",
-      "_index-BZYhE2TF.js",
       "_index-rimy3MAc.js",
       "_index-fNjTmf9T.js"
     ]
@@ -10172,7 +10171,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-DE_he755.js",
+    "file": "assets/System-B3XD6HLR.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
