@@ -167,8 +167,8 @@
     "file": "assets/DxButton-DV0H-ZcL.js",
     "name": "DxButton"
   },
-  "_FilterControls-CcIJYt7y.js": {
-    "file": "assets/FilterControls-CcIJYt7y.js",
+  "_FilterControls-DrIh_DOO.js": {
+    "file": "assets/FilterControls-DrIh_DOO.js",
     "name": "FilterControls",
     "imports": [
       "_createLucideIcon-Cy5Ya80P.js",
@@ -784,12 +784,9 @@
       "_index-BH53Isel.js"
     ]
   },
-  "_dataUrlToBlobUrl-B5tMm8tX.js": {
-    "file": "assets/dataUrlToBlobUrl-B5tMm8tX.js",
+  "_dataUrlToBlobUrl-2Fag9C-O.js": {
+    "file": "assets/dataUrlToBlobUrl-2Fag9C-O.js",
     "name": "dataUrlToBlobUrl",
-    "imports": [
-      "_index-BH53Isel.js"
-    ],
     "css": [
       "dataUrlToBlobUrl.css"
     ]
@@ -1004,8 +1001,8 @@
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js"
     ]
   },
-  "_jspdf.es.min-BmH6mfka.js": {
-    "file": "assets/jspdf.es.min-BmH6mfka.js",
+  "_jspdf.es.min-DdfNsx49.js": {
+    "file": "assets/jspdf.es.min-DdfNsx49.js",
     "name": "jspdf.es.min",
     "imports": [
       "_index-BH53Isel.js",
@@ -1345,6 +1342,16 @@
     "name": "purify.es",
     "src": "node_modules/dompurify/dist/purify.es.mjs",
     "isDynamicEntry": true
+  },
+  "node_modules/pdf-lib/es/index.js": {
+    "file": "assets/index-Cs2o_Y_o.js",
+    "name": "index",
+    "src": "node_modules/pdf-lib/es/index.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
   },
   "resources/css/app.css": {
     "file": "app.css",
@@ -4183,7 +4190,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-DkooIbRJ.js",
+    "file": "assets/BananaLab-CBPK8RNY.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isDynamicEntry": true,
@@ -4242,17 +4249,17 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor.jsx": {
-    "file": "assets/Editor-Rcqy-knR.js",
+    "file": "assets/Editor-Bn2F2uTE.js",
     "name": "Editor",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_dataUrlToBlobUrl-B5tMm8tX.js",
       "_preload-helper-BfFHrpNk.js",
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BH53Isel.js",
-      "_FilterControls-CcIJYt7y.js",
+      "_FilterControls-DrIh_DOO.js",
       "resources/js/Components/Tailwind/BananaLab/utils/thumbnailGenerator.jsx",
+      "_dataUrlToBlobUrl-2Fag9C-O.js",
       "_layers-6oegOx-p.js",
       "_chevron-down-DS-mdh9v.js",
       "_chevron-right-Ckt5D2ka.js",
@@ -4263,7 +4270,7 @@
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
       "_image-BEA0kkBS.js",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
-      "_jspdf.es.min-BmH6mfka.js",
+      "_jspdf.es.min-DdfNsx49.js",
       "_index-BJa4kPFi.js",
       "_main-Byrjfx4U.js",
       "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
@@ -4289,17 +4296,20 @@
       "_index-BSWw-p5k.js",
       "resources/js/Components/Tailwind/BananaLab/components/Elements/TextElement.jsx",
       "_upload-qgEr5bIl.js",
+      "_typeof-QjJsDpFa.js",
       "_index-fRpqIG3j.js",
       "_index-B6ujFmsw.js",
-      "_typeof-QjJsDpFa.js",
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js",
       "resources/js/Components/Tailwind/Checkouts/Components/PaymentModal.jsx",
       "_index-Chjiymov.js",
       "_x-DBMwyD6F.js"
+    ],
+    "dynamicImports": [
+      "node_modules/pdf-lib/es/index.js"
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor_00.jsx": {
-    "file": "assets/Editor_00-k2d2rzWO.js",
+    "file": "assets/Editor_00-P9rcVa2v.js",
     "name": "Editor_00",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor_00.jsx",
     "isEntry": true,
@@ -4308,7 +4318,7 @@
       "_index-BH53Isel.js",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
       "resources/js/Components/Tailwind/BananaLab/utils/thumbnailGenerator.jsx",
-      "_jspdf.es.min-BmH6mfka.js",
+      "_jspdf.es.min-DdfNsx49.js",
       "_index-BJa4kPFi.js",
       "_main-Byrjfx4U.js",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
@@ -4374,7 +4384,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx": {
-    "file": "assets/V1Edit-xF40jXjS.js",
+    "file": "assets/V1Edit-C6Nbf6VY.js",
     "name": "V1Edit",
     "src": "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
     "isEntry": true,
@@ -4384,8 +4394,9 @@
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
       "resources/js/Components/Tailwind/BananaLab/utils/thumbnailGenerator.jsx",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
+      "_preload-helper-BfFHrpNk.js",
       "resources/js/Components/Tailwind/Checkouts/Components/PaymentModal.jsx",
-      "_jspdf.es.min-BmH6mfka.js",
+      "_jspdf.es.min-DdfNsx49.js",
       "_x-DBMwyD6F.js",
       "_chevron-left-B2s3ZsB7.js",
       "_chevron-right-Ckt5D2ka.js",
@@ -4400,8 +4411,10 @@
       "resources/js/Components/Tailwind/BananaLab/components/Elements/TextElement.jsx",
       "_upload-qgEr5bIl.js",
       "_index-Chjiymov.js",
-      "_preload-helper-BfFHrpNk.js",
       "_typeof-QjJsDpFa.js"
+    ],
+    "dynamicImports": [
+      "node_modules/pdf-lib/es/index.js"
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/CardBanana.jsx": {
@@ -4440,7 +4453,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview.jsx": {
-    "file": "assets/BookPreview-C-ZYf36o.js",
+    "file": "assets/BookPreview-rEFvlwSV.js",
     "name": "BookPreview",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview.jsx",
     "isEntry": true,
@@ -4448,7 +4461,7 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BH53Isel.js",
       "resources/js/Components/Tailwind/Checkouts/Components/PaymentModal.jsx",
-      "_jspdf.es.min-BmH6mfka.js",
+      "_jspdf.es.min-DdfNsx49.js",
       "resources/js/Components/Tailwind/BananaLab/utils/thumbnailGenerator.jsx",
       "_index-yBjzXJbu.js",
       "_index-B6ujFmsw.js",
@@ -4474,7 +4487,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx": {
-    "file": "assets/EditorLayout-BRN33LXr.js",
+    "file": "assets/EditorLayout-B9zigUT-.js",
     "name": "EditorLayout",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
     "isEntry": true,
@@ -4496,7 +4509,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx": {
-    "file": "assets/EditorMain-XsqBGOYW.js",
+    "file": "assets/EditorMain-CmA53jPW.js",
     "name": "EditorMain",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
     "isEntry": true,
@@ -4588,7 +4601,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/PageEditor.jsx": {
-    "file": "assets/PageEditor-b9BA3efi.js",
+    "file": "assets/PageEditor-DdfTROdZ.js",
     "name": "PageEditor",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/PageEditor.jsx",
     "isEntry": true,
@@ -9947,7 +9960,7 @@
     ]
   },
   "resources/js/Pages/Canvas/Editor.jsx": {
-    "file": "assets/Editor-BBizY5o6.js",
+    "file": "assets/Editor-CdYZDEE0.js",
     "name": "Editor",
     "src": "resources/js/Pages/Canvas/Editor.jsx",
     "isEntry": true,
@@ -9959,9 +9972,8 @@
       "_index-yBjzXJbu.js",
       "_index-NIGUFBhG.js",
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js",
-      "_dataUrlToBlobUrl-B5tMm8tX.js",
       "_preload-helper-BfFHrpNk.js",
-      "_FilterControls-CcIJYt7y.js",
+      "_FilterControls-DrIh_DOO.js",
       "_createLucideIcon-Cy5Ya80P.js",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
       "_index-BJa4kPFi.js",
@@ -9979,13 +9991,14 @@
       "_chevron-up-D78jyEhP.js",
       "_chevron-down-DS-mdh9v.js",
       "resources/js/Components/Tailwind/BananaLab/utils/thumbnailGenerator.jsx",
+      "_dataUrlToBlobUrl-2Fag9C-O.js",
       "_layers-6oegOx-p.js",
       "_chevron-right-Ckt5D2ka.js",
       "_eye-CKCH9ORv.js",
       "_star-wPQTHY_n.js",
       "_image-BEA0kkBS.js",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
-      "_jspdf.es.min-BmH6mfka.js",
+      "_jspdf.es.min-DdfNsx49.js",
       "_typeof-QjJsDpFa.js",
       "_main-Byrjfx4U.js",
       "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
@@ -10159,7 +10172,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-CnQMM24v.js",
+    "file": "assets/System-DCk3LeGq.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,

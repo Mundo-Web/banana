@@ -6,8 +6,6 @@ import html2canvas from 'html2canvas'; // Para captura de alta calidad
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
 
-import { PDFDocument, rgb } from 'pdf-lib';
-
 // ⚡ OPTIMIZACIÓN: Sistema de logging inteligente
 const isServer = typeof window === 'undefined';
 const isDev = process.env.NODE_ENV === 'development';

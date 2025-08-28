@@ -155,7 +155,7 @@ const BookPreviewModal = ({
             let pdfSuccess = false;
             if (!pdfGenerated && !pdfGenerationInProgress) {
                 console.log('📄 [PURCHASE] PASO 1: Generando PDF para compra...');
-                
+
                 setAlbumPreparationModal({
                     isOpen: true,
                     message: "📄 Generando PDF...",
@@ -165,10 +165,10 @@ const BookPreviewModal = ({
 
                 pdfSuccess = await generatePDFSilently();
                 console.log('📄 [PURCHASE] Resultado de generatePDFSilently:', pdfSuccess);
-                
+
                 if (!pdfSuccess) {
                     console.error('❌ [PURCHASE] PDF no se pudo generar o subir correctamente');
-                    setAlbumPreparationModal({ 
+                    setAlbumPreparationModal({
                         isOpen: true,
                         message: "❌ Error en PDF",
                         subMessage: "No pudimos generar el archivo",
@@ -179,7 +179,7 @@ const BookPreviewModal = ({
                     alert('Error: No se pudo generar el PDF del álbum. Por favor, inténtelo nuevamente.');
                     return;
                 }
-                
+
                 console.log('✅ [PURCHASE] PDF generado y subido exitosamente al servidor');
                 setAlbumPreparationModal({
                     isOpen: true,
@@ -210,7 +210,7 @@ const BookPreviewModal = ({
 
             console.log('🛒 [CART] PASO 2: PDF confirmado en servidor, agregando al carrito...');
             const cartResult = addAlbumToCart();
-            
+
             let addedToCart;
             if (cartResult && typeof cartResult.then === 'function') {
                 console.log('🛒 [CART] addAlbumToCart es async, esperando resultado...');
@@ -222,7 +222,7 @@ const BookPreviewModal = ({
 
             if (!addedToCart) {
                 console.error('❌ No se pudo agregar al carrito');
-                setAlbumPreparationModal({ 
+                setAlbumPreparationModal({
                     isOpen: true,
                     message: "❌ Error en carrito",
                     subMessage: "No pudimos agregar el álbum",
@@ -234,7 +234,7 @@ const BookPreviewModal = ({
             }
 
             console.log('✅ [PURCHASE] Álbum agregado exitosamente al carrito');
-            
+
             // 🔧 PASO 3: SOLO DESPUÉS DE TODO LO ANTERIOR, redirigir
             setAlbumPreparationModal({
                 isOpen: true,
@@ -253,27 +253,27 @@ const BookPreviewModal = ({
             });
 
             console.log('✅ [REDIRECT] Todo completado exitosamente, redirigiendo...');
-            
+
             // Dar tiempo para mostrar el éxito antes de redirigir
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             // Cerrar modal y redirigir
             setAlbumPreparationModal({ isOpen: false, message: "", subMessage: "", progress: 0 });
             onRequestClose();
             window.location.href = '/cart';
-            
+
         } catch (error) {
             console.error('❌ Error en proceso de compra:', error);
-            setAlbumPreparationModal({ 
+            setAlbumPreparationModal({
                 isOpen: true,
                 message: "❌ Error inesperado",
                 subMessage: "Algo salió mal durante el proceso",
                 progress: 0
             });
-            
+
             await new Promise(resolve => setTimeout(resolve, 2000));
             setAlbumPreparationModal({ isOpen: false, message: "", subMessage: "", progress: 0 });
-            
+
             // Verificación de carrito y redirección de emergencia
             try {
                 const cartKey = `${window.Global?.APP_CORRELATIVE || 'bananalab'}_cart`;
@@ -485,7 +485,7 @@ const BookPreviewModal = ({
             Object.assign(newThumbnails, thumb);
         });
 
-      
+
 
         // Actualizar estado
         setGeneratedThumbnails(newThumbnails);
@@ -507,20 +507,20 @@ const BookPreviewModal = ({
             id: page.id || `page-${index}`,
             index: index
         }));
-        
+
         // Asegurarse de que las dimensiones originales están correctamente enviadas
         const enhancedDimensions = {
             ...workspaceDimensions,
             // Garantizar que originalWidth y originalHeight siempre estén presentes en mm
-            originalWidth: workspaceDimensions.originalWidth || 
+            originalWidth: workspaceDimensions.originalWidth ||
                 (itemData?.dimensions?.width ? parseFloat(itemData.dimensions.width) : 297), // Valor por defecto A4 horizontal
-            originalHeight: workspaceDimensions.originalHeight || 
+            originalHeight: workspaceDimensions.originalHeight ||
                 (itemData?.dimensions?.height ? parseFloat(itemData.dimensions.height) : 210), // Valor por defecto A4 horizontal
             // Asegurar que se envían como números, no como strings
             width: parseInt(workspaceDimensions.width || 800),
             height: parseInt(workspaceDimensions.height || 600)
         };
-        
+
         return {
             format: projectData?.format || 'album',
             quality: 'high',
@@ -531,13 +531,13 @@ const BookPreviewModal = ({
             use_pdf_thumbnails: true
         };
     };
-    
+
     // Función para generar PDF directamente en el frontend usando las imágenes del flipbook
     const generatePDFSilently = async () => {
         console.log('🎯 [FRONTEND-PDF] ========== FUNCIÓN LLAMADA ==========');
         console.log('🎯 [FRONTEND-PDF] projectData:', projectData);
         console.log('🎯 [FRONTEND-PDF] pdfGenerationInProgress:', pdfGenerationInProgress);
-        
+
         if (!projectData?.id) {
             console.warn('📄 [FRONTEND-PDF] No hay proyecto cargado.');
             return false;
@@ -552,14 +552,101 @@ const BookPreviewModal = ({
         setPdfGenerationInProgress(true);
         console.log('🚀 [FRONTEND-PDF] Iniciando generación de PDF en el frontend...');
 
+        // try {
+        //     // Usar las mismas imágenes que estamos mostrando en el flipbook
+        //     const imagesToUse = Object.keys(activeThumbnails).length > 0 ? activeThumbnails : generatedThumbnails;
+
+        //     console.log('🔍 [FRONTEND-PDF] activeThumbnails:', Object.keys(activeThumbnails).length, 'elementos');
+        //     console.log('🔍 [FRONTEND-PDF] generatedThumbnails:', Object.keys(generatedThumbnails).length, 'elementos');
+        //     console.log('🔍 [FRONTEND-PDF] imagesToUse:', Object.keys(imagesToUse).length, 'elementos');
+
+        //     if (Object.keys(imagesToUse).length === 0) {
+        //         console.warn('⚠️ [FRONTEND-PDF] No hay imágenes disponibles para el PDF');
+        //         console.log('⚠️ [FRONTEND-PDF] activeThumbnails:', activeThumbnails);
+        //         console.log('⚠️ [FRONTEND-PDF] generatedThumbnails:', generatedThumbnails);
+        //         return false;
+        //     }
+
+        //     console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
+
+        //     // Usar jsPDF ya importado al inicio del archivo
+        //     console.log('📦 [FRONTEND-PDF] Verificando jsPDF:', typeof jsPDF);
+
+        //     // Configurar dimensiones del PDF (usar las del workspace)
+        //     const pdfWidthMm4 = workspaceDimensions.originalWidth || 210;
+        //     const pdfHeightMm4 = workspaceDimensions.originalHeight || 297;
+
+        //     // Configurar dimensiones del PDF (usar las del workspace)
+        //     const pdfWidthMm = pdfWidthMm4/6;
+        //     const pdfHeightMm = pdfHeightMm4/6;
+        //     console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthMm + 'mm x ' + pdfHeightMm + 'mm');
+
+        //     // Crear PDF
+        //     const pdf = new jsPDF({
+        //         orientation: pdfWidthMm > pdfHeightMm ? 'landscape' : 'portrait',
+        //         unit: 'mm',
+        //         format: [pdfWidthMm, pdfHeightMm]
+        //     });
+
+        //     // Obtener páginas ordenadas
+        //     const bookPages = createBookPages();
+        //     let pageCount = 0;
+
+        //     for (const page of bookPages) {
+        //         const imageUrl = imagesToUse[page.originalId || page.id];
+
+        //         if (imageUrl) {
+        //             try {
+        //                 // Si es la primera página, no agregar nueva página
+        //                 if (pageCount > 0) {
+        //                     pdf.addPage([pdfWidthMm, pdfHeightMm]);
+        //                 }
+
+        //                 // Agregar imagen a la página
+        //                 pdf.addImage(imageUrl, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm);
+        //                 pageCount++;
+
+        //                 console.log(`📄 [FRONTEND-PDF] Página ${pageCount} agregada al PDF`);
+        //             } catch (imageError) {
+        //                 console.warn(`⚠️ [FRONTEND-PDF] Error agregando página ${pageCount + 1}:`, imageError);
+        //             }
+        //         }
+        //     }
+
+        //     if (pageCount === 0) {
+        //         console.error('❌ [FRONTEND-PDF] No se pudo agregar ninguna página al PDF');
+        //         return false;
+        //     }
+
+        //     // Generar PDF como blob
+        //     const pdfBlob = pdf.output('blob');
+        //     console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
+
+        //     // Subir PDF al servidor
+        //     console.log('🚀 [FRONTEND-PDF] Iniciando subida al servidor...');
+        //     const uploadResult = await uploadPDFToServer(pdfBlob);
+        //     console.log('🏁 [FRONTEND-PDF] Resultado de subida:', uploadResult);
+        //     return uploadResult;
+
+        // } catch (error) {
+        //     console.error('❌ [FRONTEND-PDF] Error generando PDF:', error);
+        //     return false;
+        // } finally {
+        //     setPdfGenerationInProgress(false);
+        //     console.log('🏁 [FRONTEND-PDF] Proceso finalizado');
+        // }
+
         try {
+            // Importar pdf-lib
+            const { PDFDocument } = await import('pdf-lib');
+
             // Usar las mismas imágenes que estamos mostrando en el flipbook
             const imagesToUse = Object.keys(activeThumbnails).length > 0 ? activeThumbnails : generatedThumbnails;
-            
+
             console.log('🔍 [FRONTEND-PDF] activeThumbnails:', Object.keys(activeThumbnails).length, 'elementos');
             console.log('🔍 [FRONTEND-PDF] generatedThumbnails:', Object.keys(generatedThumbnails).length, 'elementos');
             console.log('🔍 [FRONTEND-PDF] imagesToUse:', Object.keys(imagesToUse).length, 'elementos');
-            
+
             if (Object.keys(imagesToUse).length === 0) {
                 console.warn('⚠️ [FRONTEND-PDF] No hay imágenes disponibles para el PDF');
                 console.log('⚠️ [FRONTEND-PDF] activeThumbnails:', activeThumbnails);
@@ -569,43 +656,52 @@ const BookPreviewModal = ({
 
             console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
 
-            // Usar jsPDF ya importado al inicio del archivo
-            console.log('📦 [FRONTEND-PDF] Verificando jsPDF:', typeof jsPDF);
-
             // Configurar dimensiones del PDF (usar las del workspace)
             const pdfWidthMm4 = workspaceDimensions.originalWidth || 210;
             const pdfHeightMm4 = workspaceDimensions.originalHeight || 297;
 
-            // Configurar dimensiones del PDF (usar las del workspace)
-            const pdfWidthMm = pdfWidthMm4/6;
-            const pdfHeightMm = pdfHeightMm4/6;
+            // Escalar dimensiones
+            const pdfWidthMm = pdfWidthMm4 / 6;
+            const pdfHeightMm = pdfHeightMm4 / 6;
             console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthMm + 'mm x ' + pdfHeightMm + 'mm');
 
-            // Crear PDF
-            const pdf = new jsPDF({
-                orientation: pdfWidthMm > pdfHeightMm ? 'landscape' : 'portrait',
-                unit: 'mm',
-                format: [pdfWidthMm, pdfHeightMm]
-            });
+            // Convertir mm a puntos (1 mm = 2.83465 pt)
+            const pdfWidthPt = pdfWidthMm * 2.83465;
+            const pdfHeightPt = pdfHeightMm * 2.83465;
+
+            // Crear documento PDF
+            const pdfDoc = await PDFDocument.create();
 
             // Obtener páginas ordenadas
             const bookPages = createBookPages();
             let pageCount = 0;
 
-            for (const page of bookPages) {
-                const imageUrl = imagesToUse[page.originalId || page.id];
-                
+            for (const pageData of bookPages) {
+                const imageUrl = imagesToUse[pageData.originalId || pageData.id];
+
                 if (imageUrl) {
                     try {
-                        // Si es la primera página, no agregar nueva página
-                        if (pageCount > 0) {
-                            pdf.addPage([pdfWidthMm, pdfHeightMm]);
+                        // Crear nueva página
+                        const page = pdfDoc.addPage([pdfWidthPt, pdfHeightPt]);
+
+                        // Descargar la imagen y embeberla
+                        const imgBytes = await fetch(imageUrl).then(res => res.arrayBuffer());
+                        let embeddedImage;
+                        if (imageUrl.startsWith('data:image/png')) {
+                            embeddedImage = await pdfDoc.embedPng(imgBytes);
+                        } else {
+                            embeddedImage = await pdfDoc.embedJpg(imgBytes);
                         }
 
-                        // Agregar imagen a la página
-                        pdf.addImage(imageUrl, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm);
+                        // Dibujar imagen en la página
+                        page.drawImage(embeddedImage, {
+                            x: 0,
+                            y: 0,
+                            width: pdfWidthPt,
+                            height: pdfHeightPt,
+                        });
+
                         pageCount++;
-                        
                         console.log(`📄 [FRONTEND-PDF] Página ${pageCount} agregada al PDF`);
                     } catch (imageError) {
                         console.warn(`⚠️ [FRONTEND-PDF] Error agregando página ${pageCount + 1}:`, imageError);
@@ -619,7 +715,8 @@ const BookPreviewModal = ({
             }
 
             // Generar PDF como blob
-            const pdfBlob = pdf.output('blob');
+            const pdfBytes = await pdfDoc.save();
+            const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
             console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
 
             // Subir PDF al servidor
@@ -635,6 +732,7 @@ const BookPreviewModal = ({
             setPdfGenerationInProgress(false);
             console.log('🏁 [FRONTEND-PDF] Proceso finalizado');
         }
+
     };
 
     // Función para subir el PDF generado al servidor
@@ -681,20 +779,20 @@ const BookPreviewModal = ({
             if (response.ok) {
                 const result = await response.json();
                 console.log('✅ [UPLOAD-PDF] PDF subido exitosamente:', result);
-                
+
                 // 🔧 Log de éxito persistente
                 localStorage.setItem(logKey, JSON.stringify({
                     timestamp: new Date().toISOString(),
                     step: 'upload_exitoso',
                     result: result
                 }));
-                
+
                 setPdfGenerated(true);
                 return true;
             } else {
                 const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
                 console.error('❌ [UPLOAD-PDF] Error subiendo PDF:', response.status, errorData.message);
-                
+
                 // 🔧 Log de error persistente
                 localStorage.setItem(logKey, JSON.stringify({
                     timestamp: new Date().toISOString(),
@@ -702,13 +800,13 @@ const BookPreviewModal = ({
                     status: response.status,
                     error: errorData.message
                 }));
-                
+
                 return false;
             }
         } catch (error) {
             console.error('❌ [UPLOAD-PDF] Error en la subida:', error.message);
             console.error('❌ [UPLOAD-PDF] Stack trace:', error);
-            
+
             // 🔧 Log de excepción persistente
             const logKey = `pdf_upload_log_${projectData.id}`;
             localStorage.setItem(logKey, JSON.stringify({
@@ -717,7 +815,7 @@ const BookPreviewModal = ({
                 error: error.message,
                 stack: error.stack
             }));
-            
+
             return false;
         }
     };
@@ -733,7 +831,7 @@ const BookPreviewModal = ({
 
         try {
             const pdfData = preparePDFData();
-            
+
             const response = await fetch(`/api/customer/projects/${projectData.id}/generate-pdf`, {
                 method: 'POST',
                 headers: {
@@ -782,7 +880,7 @@ const BookPreviewModal = ({
                 setGeneratedThumbnails({});
                 console.log('📄 [BOOK-PREVIEW] Sin thumbnails, usando placeholders');
             }
-            
+
             // � REMOVIDO: No generar PDF automáticamente aquí para evitar duplicados
             // La generación de PDF solo debe ocurrir cuando el usuario hace clic en "Comprar ahora"
             console.log('📖 [BOOK-PREVIEW] Modal abierto, inicializando estado...');
@@ -1006,7 +1104,7 @@ const BookPreviewModal = ({
         const hasCover = itemData?.has_cover_image === true || itemData?.has_cover_image === 1;
         const hasBackCover = itemData?.has_back_cover_image === true || itemData?.has_back_cover_image === 1;
 
-   
+
 
         // Filtrar páginas según configuración
         const enabledPages = pages.filter(page => {
@@ -1020,7 +1118,7 @@ const BookPreviewModal = ({
             return true;
         });
 
-       
+
 
         return enabledPages;
     };
@@ -1040,7 +1138,7 @@ const BookPreviewModal = ({
         const bookPages = enabledPages.map((page, index) => {
             // 🎯 CALCULAR TÍTULO INTELIGENTE
             let pageTitle = '';
-            
+
             if (page.type === 'cover') {
                 pageTitle = 'Portada';
             } else if (page.type === 'final') {
@@ -1064,7 +1162,7 @@ const BookPreviewModal = ({
             };
         });
 
-    
+
 
         return bookPages;
     };
@@ -1073,8 +1171,8 @@ const BookPreviewModal = ({
 
     // ✅ CONFIGURACIÓN INTELIGENTE: Determinar si tenemos portada para configurar HTMLFlipBook
     const hasRealCover = bookPages.length > 0 && bookPages[0]?.pageType === 'cover';
-    const contentOnlyMode = bookPages.length > 0 && !hasRealCover && 
-                           !bookPages.some(p => p.pageType === 'final');
+    const contentOnlyMode = bookPages.length > 0 && !hasRealCover &&
+        !bookPages.some(p => p.pageType === 'final');
 
 
 
@@ -1201,28 +1299,28 @@ const BookPreviewModal = ({
                     </button>
 
                     <div className="flex items-center">
-                    <span className="flex items-center text-gray-700 text-base font-medium px-4 py-2 bg-gray-50 rounded-lg" aria-live="polite">
-                        {(() => {
-                            const currentPageData = bookPages[currentPage];
-                            if (!currentPageData) return 'Cargando...';
+                        <span className="flex items-center text-gray-700 text-base font-medium px-4 py-2 bg-gray-50 rounded-lg" aria-live="polite">
+                            {(() => {
+                                const currentPageData = bookPages[currentPage];
+                                if (!currentPageData) return 'Cargando...';
 
-                            // 🔍 DEBUG: Log datos de la página actual
-                           
+                                // 🔍 DEBUG: Log datos de la página actual
 
-                            // Usar el título generado
-                            return currentPageData.pageTitle || `Página ${currentPage + 1}`;
-                        })()}
-                        <span className="mx-2 text-gray-400">•</span>
-                        {currentPage + 1} / {bookPages.length} páginas
-                        {contentOnlyMode && (
-                            <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                Solo contenido
-                            </span>
-                        )}
-                    </span>
-                    
-                  
-                </div>
+
+                                // Usar el título generado
+                                return currentPageData.pageTitle || `Página ${currentPage + 1}`;
+                            })()}
+                            <span className="mx-2 text-gray-400">•</span>
+                            {currentPage + 1} / {bookPages.length} páginas
+                            {contentOnlyMode && (
+                                <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    Solo contenido
+                                </span>
+                            )}
+                        </span>
+
+
+                    </div>
 
                     <button
                         onClick={goToNextPage}
@@ -1267,8 +1365,8 @@ const BookPreviewModal = ({
                             // 🔧 DEBUG: Log para verificar thumbnails disponibles para cada página
                             const thumbnailKey = page.originalId || page.id;
                             const hasThumbnail = !!activeThumbnails[thumbnailKey];
-                            
-                       
+
+
 
                             return (
                                 <div
@@ -1304,7 +1402,7 @@ const BookPreviewModal = ({
                                             }}>
                                                 {/* 🎯 NUEVO: Mostrar logo si está disponible */}
                                                 {page.hasLogo && page.logoUrl ? (
-                                                    <img 
+                                                    <img
                                                         src={page.logoUrl}
                                                         alt="Logo"
                                                         style={{
@@ -1325,31 +1423,31 @@ const BookPreviewModal = ({
                                                 )}
                                             </div>
                                         ) : activeThumbnails[page.originalId || page.id] ? (
-                                        // Página con contenido usando thumbnails disponibles
-                                        <img
-                                            src={activeThumbnails[page.originalId || page.id]}
-                                            alt={page.pageTitle || `Página ${pageIdx + 1}`}
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'contain',
-                                                margin: 0,
-                                                padding: 0,
-                                                border: 'none',
-                                                imageRendering: 'auto',
-                                                backgroundColor: '#ffffff',
-                                                WebkitBackfaceVisibility: 'hidden',
-                                                backfaceVisibility: 'hidden',
-                                                WebkitTransform: 'translateZ(0)',
-                                                transform: 'translateZ(0)'
-                                            }}
-                                        />
-                                    ) : (
-                                        // Placeholder inline si no hay thumbnail
-                                        <InlinePlaceholder page={page} pageIdx={pageIdx} />
-                                    )}
+                                            // Página con contenido usando thumbnails disponibles
+                                            <img
+                                                src={activeThumbnails[page.originalId || page.id]}
+                                                alt={page.pageTitle || `Página ${pageIdx + 1}`}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'contain',
+                                                    margin: 0,
+                                                    padding: 0,
+                                                    border: 'none',
+                                                    imageRendering: 'auto',
+                                                    backgroundColor: '#ffffff',
+                                                    WebkitBackfaceVisibility: 'hidden',
+                                                    backfaceVisibility: 'hidden',
+                                                    WebkitTransform: 'translateZ(0)',
+                                                    transform: 'translateZ(0)'
+                                                }}
+                                            />
+                                        ) : (
+                                            // Placeholder inline si no hay thumbnail
+                                            <InlinePlaceholder page={page} pageIdx={pageIdx} />
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
                             );
                         })}
                     </HTMLFlipBook>
@@ -1357,7 +1455,7 @@ const BookPreviewModal = ({
             </div>
             {/* Botones de acción */}
             <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full max-w-2xl mx-auto">
-                
+
                 {/* Botón Comprar ahora */}
                 <button
                     className={`flex-1 py-3 px-4 rounded-lg font-semibold shadow transition flex items-center justify-center ${isProcessing
@@ -1394,7 +1492,7 @@ const BookPreviewModal = ({
                     <div className="bg-white rounded-3xl shadow-2xl p-8 min-w-96 max-w-96 mx-4 text-center relative overflow-hidden animate-in zoom-in duration-500">
                         {/* Fondo animado con partículas flotantes */}
                         <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 opacity-60"></div>
-                        
+
                         {/* Efectos de partículas flotantes */}
                         <div className="absolute inset-0">
                             <div className="absolute top-4 left-4 w-2 h-2 bg-purple-300 rounded-full animate-bounce opacity-60" style={{ animationDelay: '0s' }}></div>
@@ -1402,7 +1500,7 @@ const BookPreviewModal = ({
                             <div className="absolute bottom-8 left-8 w-1.5 h-1.5 bg-pink-300 rounded-full animate-bounce opacity-60" style={{ animationDelay: '1s' }}></div>
                             <div className="absolute bottom-4 right-4 w-1 h-1 bg-purple-400 rounded-full animate-bounce opacity-60" style={{ animationDelay: '1.5s' }}></div>
                         </div>
-                        
+
                         {/* Contenido */}
                         <div className="relative z-10">
                             {/* Icono principal animado con glow effect */}
@@ -1411,22 +1509,22 @@ const BookPreviewModal = ({
                                     {/* Glow effect */}
                                     <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full animate-ping opacity-20"></div>
                                     <div className="absolute inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full animate-pulse"></div>
-                                    
+
                                     {/* Icono del libro */}
                                     <svg className="w-12 h-12 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                     </svg>
                                 </div>
-                                
+
                                 {/* Anillo de progreso mejorado */}
                                 <div className="absolute inset-0 w-24 h-24 mx-auto">
                                     <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 96 96">
                                         <circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="4" fill="none" className="text-gray-200" />
-                                        <circle 
-                                            cx="48" cy="48" r="44" 
-                                            stroke="url(#progressGradient)" 
-                                            strokeWidth="4" 
-                                            fill="none" 
+                                        <circle
+                                            cx="48" cy="48" r="44"
+                                            stroke="url(#progressGradient)"
+                                            strokeWidth="4"
+                                            fill="none"
                                             strokeLinecap="round"
                                             strokeDasharray={`${2 * Math.PI * 44}`}
                                             strokeDashoffset={`${2 * Math.PI * 44 * (1 - albumPreparationModal.progress / 100)}`}
@@ -1446,7 +1544,7 @@ const BookPreviewModal = ({
                             <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3 animate-pulse">
                                 {albumPreparationModal.message}
                             </h2>
-                            
+
                             {/* Submensaje */}
                             <p className="text-gray-600 mb-6 text-base leading-relaxed">
                                 {albumPreparationModal.subMessage}
@@ -1454,7 +1552,7 @@ const BookPreviewModal = ({
 
                             {/* Barra de progreso con glow */}
                             <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden shadow-inner">
-                                <div 
+                                <div
                                     className="bg-gradient-to-r from-purple-500 to-pink-500 h-4 rounded-full transition-all duration-500 ease-out relative"
                                     style={{ width: `${albumPreparationModal.progress}%` }}
                                 >
@@ -1468,7 +1566,7 @@ const BookPreviewModal = ({
                                 {albumPreparationModal.progress}%
                             </p>
                         </div>
-                        
+
                         {/* CSS para efectos adicionales */}
                         <style jsx>{`
                             @keyframes shimmer {
@@ -1489,14 +1587,14 @@ const BookPreviewModal = ({
 // Componente para placeholder inline simple
 const InlinePlaceholder = ({ page, pageIdx }) => {
     // Usar los nuevos campos del objeto page con prioridad
-    const pageTitle = page.pageTitle || 
-                     (page.type === 'content' ? `Página ${page.originalPageNumber || page.pageNumber || pageIdx + 1}` : 
-                      page.type === 'cover' ? 'Portada' :
-                      page.type === 'final' ? 'Contraportada' :
-                      `Página ${pageIdx + 1}`);
-    
+    const pageTitle = page.pageTitle ||
+        (page.type === 'content' ? `Página ${page.originalPageNumber || page.pageNumber || pageIdx + 1}` :
+            page.type === 'cover' ? 'Portada' :
+                page.type === 'final' ? 'Contraportada' :
+                    `Página ${pageIdx + 1}`);
+
     const pageType = page.pageType || page.type || 'content';
-    
+
     let pageIcon = '';
 
     switch (pageType) {
@@ -1513,7 +1611,7 @@ const InlinePlaceholder = ({ page, pageIdx }) => {
             pageIcon = '📄';
     }
 
-  
+
 
     return (
         <div
@@ -1739,7 +1837,7 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
                                 const dx = cellX + elX;
                                 const dy = cellY + elY;
 
-                            
+
 
                                 // Dibujar la imagen con las coordenadas y dimensiones calculadas
                                 drawImageCover(customCtx, img, dx, dy, elW, elH);
@@ -1801,7 +1899,7 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
 }
 
 // 🔧 Función helper para revisar logs persistentes del PDF
-window.checkPDFUploadLogs = function(projectId) {
+window.checkPDFUploadLogs = function (projectId) {
     const logKey = `pdf_upload_log_${projectId}`;
     const logs = localStorage.getItem(logKey);
     if (logs) {
@@ -1814,23 +1912,23 @@ window.checkPDFUploadLogs = function(projectId) {
 };
 
 // 🔧 Función helper para limpiar logs antiguos
-window.clearPDFUploadLogs = function(projectId) {
+window.clearPDFUploadLogs = function (projectId) {
     const logKey = `pdf_upload_log_${projectId}`;
     localStorage.removeItem(logKey);
     console.log('🧹 [PDF-LOGS] Logs limpiados para proyecto', projectId);
 };
 
 // 🔧 Función helper para test rápido de PDF
-window.testPDFGeneration = function(force = false) {
+window.testPDFGeneration = function (force = false) {
     console.log('🧪 [TEST-PDF] Iniciando test de generación de PDF...');
-    
+
     // Obtener el componente BookPreview actual
     const bookPreviewElement = document.querySelector('[data-component="book-preview"]');
     if (!bookPreviewElement) {
         console.error('❌ [TEST-PDF] No se encontró elemento BookPreview');
         return;
     }
-    
+
     // Simular la generación del PDF (esto deberías hacerlo desde dentro del componente)
     console.log('🧪 [TEST-PDF] Para probar, agrega un proyecto al carrito o ejecuta desde dentro del componente');
     console.log('🧪 [TEST-PDF] ID del proyecto actual:', window.currentProjectId || 'No definido');

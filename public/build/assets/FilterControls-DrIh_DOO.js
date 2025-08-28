@@ -1,4 +1,4 @@
-import{c as B}from"./createLucideIcon-Cy5Ya80P.js";import{j as c}from"./AboutSimple-Cf8x2fCZ.js";import{r as T}from"./index-BH53Isel.js";import{i as f,D as Te}from"./EditorMain-XsqBGOYW.js";import{S as Oe}from"./sparkles-DeLUn6av.js";import{S as Ne}from"./sliders-vertical-C5ts4taK.js";import{P as Ce}from"./palette-DV_Vpyg9.js";import{S as Ie}from"./settings-BSPs3Zt8.js";import{C as M}from"./chevron-up-D78jyEhP.js";import{C as k}from"./chevron-down-DS-mdh9v.js";/**
+import{c as B}from"./createLucideIcon-Cy5Ya80P.js";import{j as c}from"./AboutSimple-Cf8x2fCZ.js";import{r as T}from"./index-BH53Isel.js";import{a as f,D as Te}from"./EditorMain-CmA53jPW.js";import{S as Oe}from"./sparkles-DeLUn6av.js";import{S as Ne}from"./sliders-vertical-C5ts4taK.js";import{P as Ce}from"./palette-DV_Vpyg9.js";import{S as Ie}from"./settings-BSPs3Zt8.js";import{C as M}from"./chevron-up-D78jyEhP.js";import{C as k}from"./chevron-down-DS-mdh9v.js";/**
  * @license lucide-react v0.445.0 - ISC
  *
  * This source code is licensed under the ISC license.
