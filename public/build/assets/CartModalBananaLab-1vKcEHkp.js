@@ -1,1 +1,0 @@
-import"./AboutSimple-Cf8x2fCZ.js";import"./index-BH53Isel.js";import{R as p}from"./PaymentModal-BB1JXzaZ.js";import"./main-6DCdASTx.js";/* empty css              */import"./index-yBjzXJbu.js";import"./index-fNjTmf9T.js";import"./index-Chjiymov.js";import"./___vite-browser-external_commonjs-proxy-0zb4Agf2.js";p.setAppElement("#app");

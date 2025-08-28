@@ -3,45 +3,10 @@ import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import html2canvas from 'html2canvas'; // Para captura de alta calidad
 
-// ⚡ OPTIMIZACIÓN: Configuración optimizada para html2canvas
-const HTML2CANVAS_CONFIG = {
-    allowTaint: true,
-    useCORS: true,
-    scale: 0.75, // ⚡ Escala reducida para mejor rendimiento
-    logging: false, // ⚡ Desactivar logs para mejor rendimiento
-    height: 150, // ⚡ Altura fija para thumbnails
-    width: 200,  // ⚡ Ancho fijo para thumbnails
-    backgroundColor: '#ffffff',
-    imageTimeout: 10000, // ⚡ TIMEOUT: Evitar bloqueos de memoria
-    removeContainer: true, // ⚡ LIMPIEZA: Remover contenedor automáticamente
-    onclone: (clonedDoc) => {
-        // ⚡ OPTIMIZACIÓN: Remover elementos costosos en el clone
-        const scripts = clonedDoc.querySelectorAll('script');
-        scripts.forEach(script => script.remove());
-
-        const videos = clonedDoc.querySelectorAll('video');
-        videos.forEach(video => video.remove());
-
-        const iframes = clonedDoc.querySelectorAll('iframe');
-        iframes.forEach(iframe => iframe.remove());
-
-        // ⚡ MEMORIA: Simplificar estilos complejos que consumen memoria
-        const allElements = clonedDoc.querySelectorAll('*');
-        allElements.forEach(el => {
-            if (el.style) {
-                // Remover propiedades costosas en memoria solo si es necesario
-                if (el.style.filter && el.style.filter.includes('blur(')) {
-                    el.style.removeProperty('filter');
-                }
-                if (el.style.backdropFilter) {
-                    el.style.removeProperty('backdrop-filter');
-                }
-            }
-        });
-    }
-};
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+
+import { PDFDocument, rgb } from 'pdf-lib';
 
 // ⚡ OPTIMIZACIÓN: Sistema de logging inteligente
 const isServer = typeof window === 'undefined';
@@ -236,23 +201,6 @@ function debounce(func, wait) {
     };
 }
 
-// Hook personalizado para debounce
-function useDebounce(value, delay) {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setDebouncedValue(value);
-        }, delay);
-
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [value, delay]);
-
-    return debouncedValue;
-}
-
 import LayerPanel from "./components/Elements/LayerPanel";
 import {
     Undo2,
@@ -261,42 +209,17 @@ import {
     ChevronLeft,
     ImageIcon,
     Type,
-    Eye,
     Plus,
-    FlipHorizontal,
-    FlipVertical,
     Copy,
     Book,
-    Lock,
     Pencil,
     CheckCircleIcon,
     Save,
-    Zap,
-    User,
-    Settings,
     HelpCircle,
-    LogOut,
     MoreHorizontal,
     Layers,
-    Crop,
-    Palette,
-    Search,
-    Download,
-    Share,
-    Grid,
-    Maximize,
-    Minimize,
-    MousePointer,
-    Shapes,
-    Sticker,
-    FileText,
     Layout,
-    Command,
     Filter,
-    Folder,
-    Star,
-    Move,
-    RotateCcw,
 } from "lucide-react";
 import { saveAs } from "file-saver";
 
@@ -306,116 +229,19 @@ import { Local } from "sode-extend-react";
 
 import { layouts } from "./constants/layouts";
 import { imageMasks } from "./constants/masks";
-import { filterPresets } from "./constants/filters";
 import Button from "./components/UI/Button";
 
-import Slider from "./components/UI/Slider";
 import EditableCell from "./components/Elements/EditableCell";
 import LayoutSelector from "./components/Elements/LayoutSelector";
-import { AdvancedSettings } from "./components/Editor/AdvancedSettings";
-import { FilterPresets } from "./components/Editor/FilterPresets";
 import { FilterControls } from "./components/Editor/FilterControls";
 
 import { MaskSelector } from "./components/Elements/MaskSelector";
-import TextToolbar from "./components/Elements/TextToolbar";
-import WorkspaceControls from "./components/Elements/WorkspaceControls";
 import BookPreviewModal from "./components/Editor/BookPreview";
 import Global from "../../../Utils/Global";
-import { generateAccurateThumbnails, generatePageThumbnail, generateMultiplePageThumbnails, generateFallbackThumbnail } from "./utils/thumbnailGenerator";
-import { generateFastThumbnails, generateHybridThumbnails, clearThumbnailCaches, generateSingleThumbnail, generateThumbnailWithGuaranteedFilters } from "./utils/thumbnailGenerator";
+import { generateFastThumbnails, clearThumbnailCaches, generateSingleThumbnail, generateThumbnailWithGuaranteedFilters } from "./utils/thumbnailGenerator";
 
-// 🔧 FUNCIÓN ESPECÍFICA PARA LAYOUTS COMPLEJOS
-const generateThumbnailForComplexLayout = async (pageData, workspaceDimensions, layout) => {
-    try {
-        // Buscar el elemento de la página en el DOM
-        const workspaceElement = document.querySelector(`#page-${pageData.id}`);
-        if (!workspaceElement) {
-            console.warn(`❌ [COMPLEX-LAYOUT] No se encontró elemento para página: ${pageData.id}`);
-            return null;
-        }
-
-        // Verificar si es un layout complejo (con col-span o row-span)
-        const isComplexLayout = layout.cellStyles && Object.values(layout.cellStyles).some(style =>
-            style.includes('col-span-') || style.includes('row-span-')
-        );
-
-        if (!isComplexLayout) {
-            // Para layouts simples, usar el método normal
-            return await generateSingleThumbnail({
-                page: pageData,
-                workspaceDimensions,
-                preserveFilters: true
-            });
-        }
-
-        // Para layouts complejos, usar html2canvas directamente con configuración especial
-        const { default: html2canvas } = await import('html2canvas');
-
-        const canvas = await html2canvas(workspaceElement, {
-            scale: 4, // ULTRA ALTA calidad para layouts complejos (4000x3200px)
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: pageData.backgroundColor || '#ffffff',
-            width: workspaceDimensions.width,
-            height: workspaceDimensions.height,
-            logging: false,
-            onclone: (clonedDoc) => {
-                // Asegurar que el grid se renderice correctamente
-                const clonedWorkspace = clonedDoc.querySelector(`#page-${pageData.id}`);
-                if (clonedWorkspace) {
-                    // Forzar estilos de grid
-                    clonedWorkspace.style.display = 'grid';
-                    clonedWorkspace.style.gridTemplateColumns = layout.template.match(/grid-cols-(\d+)/)?.[0] || 'repeat(1, 1fr)';
-                    clonedWorkspace.style.gridTemplateRows = layout.template.match(/grid-rows-(\d+)/)?.[0] || 'repeat(1, 1fr)';
-
-                    // Aplicar gap
-                    const gapMatch = layout.template.match(/gap-(\d+)/);
-                    if (gapMatch) {
-                        clonedWorkspace.style.gap = `${parseInt(gapMatch[1]) * 4}px`;
-                    } else if (layout.style?.gap) {
-                        clonedWorkspace.style.gap = layout.style.gap;
-                    }
-
-                    // Aplicar estilos específicos de celda
-                    const cells = clonedWorkspace.querySelectorAll('[data-cell-id]');
-                    cells.forEach((cell, index) => {
-                        if (layout.cellStyles && layout.cellStyles[index]) {
-                            const cellStyle = layout.cellStyles[index];
-
-                            // Aplicar col-span y row-span
-                            const colSpanMatch = cellStyle.match(/col-span-(\d+)/);
-                            const rowSpanMatch = cellStyle.match(/row-span-(\d+)/);
-
-                            if (colSpanMatch) {
-                                cell.style.gridColumn = `span ${colSpanMatch[1]}`;
-                            }
-                            if (rowSpanMatch) {
-                                cell.style.gridRow = `span ${rowSpanMatch[1]}`;
-                            }
-                        }
-                    });
-                }
-            }
-        });
-
-        if (canvas) {
-            const dataURL = canvas.toDataURL('image/png', 0.9);
-            // console.log('th [402]:', dataURL)
-            return dataURL
-        }
-
-        return null;
-    } catch (error) {
-        console.error('❌ [COMPLEX-LAYOUT] Error generando thumbnail:', error);
-        return null;
-    }
-};
-import { useSaveProject } from "./utils/useSaveProject";
 import { useAutoSave } from "./utils/useAutoSave";
-import { saveThumbnailsAsFiles } from "./utils/saveSystem";
 import SaveIndicator from "./components/UI/SaveIndicator";
-import ProgressRecoveryModal from "./components/UI/ProgressRecoveryModal";
-import domtoimage from 'dom-to-image-more';
 
 // 🚀 NUEVO: Hook para convertir data URLs a Blob URLs automáticamente
 import { useBlobThumbnails } from "./hooks/useBlobThumbnails";
@@ -856,14 +682,14 @@ export default function EditorLibro() {
     }, [activeTab]);
 
     // 🛡️ Función controlada para cambiar activeTab con logging
-    const setActiveTabControlled = useCallback((newTab, reason = 'manual') => {
-        logVPS(`🔄 [ACTIVE_TAB] Cambiando de "${activeTab}" a "${newTab}" - Razón: ${reason}`);
-        if (newTab === 'filters' && reason !== 'manual') {
-            console.warn('🚨 [ACTIVE_TAB] Cambio automático a filters bloqueado!');
-            return;
-        }
-        setActiveTab(newTab);
-    }, [activeTab]);
+    // const setActiveTabControlled = useCallback((newTab, reason = 'manual') => {
+    //     logVPS(`🔄 [ACTIVE_TAB] Cambiando de "${activeTab}" a "${newTab}" - Razón: ${reason}`);
+    //     if (newTab === 'filters' && reason !== 'manual') {
+    //         console.warn('🚨 [ACTIVE_TAB] Cambio automático a filters bloqueado!');
+    //         return;
+    //     }
+    //     setActiveTab(newTab);
+    // }, [activeTab]);
 
     // 🚨 SOLUCIÓN DE EMERGENCIA: Sistema global para forzar regeneración de thumbnails (SOLO CLIENTE)
     if (!isServer) {
@@ -2504,7 +2330,6 @@ export default function EditorLibro() {
                 workspaceBackground = workspaceStyle.backgroundColor;
             }
 
-
             // 🖨️ OPCIONES PROFESIONALES: Configuración especial para PDF vs Thumbnails (OPTIMIZADO VPS)
             const captureOptions = {
                 scale: scaleFactor,
@@ -2519,8 +2344,8 @@ export default function EditorLibro() {
                 scrollY: 0,
                 // 🔧 OPTIMIZACIÓN VPS: Reducir opciones pesadas en producción
                 ...(isLayoutMode && {
-                    windowWidth: dimensions.width,
-                    windowHeight: dimensions.height,
+                    windowWidth: dimensions.width / 2,
+                    windowHeight: dimensions.height / 2,
                     ignoreElements: (el) => {
                         // 🚀 OPTIMIZACIÓN: Logs solo en desarrollo
                         if (el.style && el.style.filter && options.preserveFilters) {
@@ -2740,7 +2565,7 @@ export default function EditorLibro() {
                                     const maxContainer = Math.max(containerWidth, containerHeight)
                                     const maxOriginal = Math.max(naturalWidth, naturalHeight)
 
-                                    const scaleFactor = maxOriginal / maxContainer
+                                    const scaleFactor = (maxOriginal / maxContainer)
 
                                     let cropWidth, cropHeight, cropX, cropY;
                                     let displayWidth, displayHeight;
@@ -2784,7 +2609,7 @@ export default function EditorLibro() {
 
                                             // 🚀 Convertir a máxima calidad 4K
                                             const croppedDataUrl = tempCanvas.toDataURL('image/png', 1.0);
-                                            // console.log('th [2786]:', croppedDataUrl)
+                                            console.log('th [2786]:', croppedDataUrl)
 
                                             // Aplicar la imagen pre-procesada
                                             img.src = croppedDataUrl;
@@ -3013,9 +2838,25 @@ export default function EditorLibro() {
                     throw new Error('Canvas del elemento de página tiene dimensiones inválidas');
                 }
 
-                // Convertir a dataURL con la calidad apropiada
-                dataUrl = canvas.toDataURL('image/png', 2);
-                // console.log('th [3017]:', dataUrl)
+                // Get canvas preset dimensions
+                const { height, width, dpi } = projectData.canvas_preset;
+                const maxSizeMm = Math.max(height, width);
+                const maxSizePx = Math.round((maxSizeMm * dpi) / 25.4);
+
+                // Create temporary canvas for resizing
+                const tempCanvas = document.createElement('canvas');
+                const maxDimension = Math.max(canvas.width, canvas.height);
+                const scale = maxSizePx / maxDimension;
+                tempCanvas.width = Math.round(canvas.width * scale);
+                tempCanvas.height = Math.round(canvas.height * scale);
+
+                // Draw and resize image
+                const ctx = tempCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+                // Convert to dataURL with appropriate quality
+                dataUrl = tempCanvas.toDataURL('image/png', 1);
+                console.log('th [3017]:', dataUrl)
 
                 if (!isProduction) {
                     //continue producction
@@ -3082,7 +2923,7 @@ export default function EditorLibro() {
                     return canvas;
                 } else {
                     const fallbackDataUrl = canvas.toDataURL('image/png', 1.0); // 🚀 Máxima calidad
-                    // console.log('th [3084]:', fallbackDataUrl)
+                    console.log('th [3084]:', fallbackDataUrl)
                     return fallbackDataUrl;
                 }
             } catch (fallbackError) {
@@ -3351,7 +3192,7 @@ export default function EditorLibro() {
                 ctx.drawImage(canvas, offsetX, offsetY, drawWidth, drawHeight);
 
                 const dataUrl = resizeCanvas.toDataURL('image/png', 1.0); // 🚀 Máxima calidad
-                // console.log('th [3353]:', dataUrl)
+                console.log('th [3353]:', dataUrl)
 
                 // Restaurar página original
                 if (pageIndex !== originalPage) {
@@ -3367,7 +3208,7 @@ export default function EditorLibro() {
             }
 
             const dataURL = canvas.toDataURL('image/png', 1.0); // 🚀 Máxima calidad
-            // console.log('th [3369]:', dataURL)
+            console.log('th [3369]:', dataURL)
             return dataURL
 
         } catch (error) {
@@ -3740,7 +3581,7 @@ export default function EditorLibro() {
 
         const { height, width, dpi } = projectData.canvas_preset;
         const maxSizeMm = Math.max(height, width);
-        const maxSizePx = Math.round((maxSizeMm * dpi) / 50.8);
+        const maxSizePx = Math.round((maxSizeMm * dpi) / 25.4);
 
         // Function to resize image if needed
         const resizeImageIfNeeded = async (file) => {
@@ -4492,7 +4333,6 @@ export default function EditorLibro() {
             log('⚠️ [PAGE-CHANGE] Misma página, no se hace nada');
             return; // No hacer nada si es la misma página
         }
-
 
 
         // Comportamiento original para local (más detallado)
@@ -6481,6 +6321,7 @@ export default function EditorLibro() {
             if (window.BLOCK_AUTO_REGENERATION) {
                 return;
             }
+            return
 
             // Encontrar páginas sin miniatura
             const pagesWithoutThumbnails = pages.filter(page => !pageThumbnails[page.id]);
@@ -6536,7 +6377,7 @@ export default function EditorLibro() {
                     }
 
                     const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
-                    // console.log('th [6539]:', thumbnail)
+                    console.log('th [6539]:', thumbnail)
 
                     // setPageThumbnails(prev => ({
                     //     ...prev,
@@ -6980,9 +6821,207 @@ export default function EditorLibro() {
     // Renderiza cada página usando el mismo componente React con alta resolución
     const generateAlbumPDF = useCallback(async () => {
 
+        // try {
+        //     // Importar jsPDF dinámicamente
+        //     const { jsPDF } = await import('jspdf');
+
+        //     // 🖨️ DIMENSIONES PROFESIONALES: Con sangrado para impresión
+        //     let pageWidthCm = presetData?.width || 21; // A4 por defecto
+        //     let pageHeightCm = presetData?.height || 29.7;
+
+        //     // Agregar sangrado de 3mm (0.3cm) en cada lado para impresión profesional
+        //     const bleedCm = 0.3; // 3mm de sangrado estándar
+        //     const printWidthCm = pageWidthCm + (bleedCm * 2);
+        //     const printHeightCm = pageHeightCm + (bleedCm * 2);
+
+        //     // Convertir a puntos (1 cm = 28.35 puntos)
+        //     const pageWidthPt = printWidthCm * 28.35;
+        //     const pageHeightPt = printHeightCm * 28.35;
+
+
+
+        //     // 🖨️ PDF PROFESIONAL: Sin compresión para máxima calidad de impresión
+        //     const pdf = new jsPDF({
+        //         orientation: pageWidthPt > pageHeightPt ? 'landscape' : 'portrait',
+        //         unit: 'pt',
+        //         format: [pageWidthPt, pageHeightPt],
+        //         compress: false // Sin compresión para calidad profesional
+        //     });
+
+        //     // Mostrar progreso
+        //     const totalPages = pages.length;
+        //     let processedPages = 0;
+
+        //     // Crear elemento de progreso
+        //     const progressContainer = document.createElement('div');
+        //     progressContainer.id = 'pdf-progress';
+        //     progressContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        //     progressContainer.innerHTML = `
+        //         <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        //             <h3 class="text-lg font-semibold mb-4">Generando PDF de alta calidad...</h3>
+        //             <div class="w-full bg-gray-200 rounded-full h-2">
+        //                 <div id="pdf-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        //             </div>
+        //             <p class="text-sm text-gray-600 mt-2">
+        //                 <span id="current-page">0</span> de ${totalPages} páginas procesadas
+        //             </p>
+        //         </div>
+        //     `;
+        //     document.body.appendChild(progressContainer);
+
+        //     const updateProgress = (current) => {
+        //         const percentage = (current / totalPages) * 100;
+        //         document.getElementById('pdf-progress-bar').style.width = `${percentage}%`;
+        //         document.getElementById('current-page').textContent = current;
+        //     };
+
+        //     // 🖨️ GUARDAR PÁGINA ORIGINAL antes del loop
+        //     const originalCurrentPage = currentPage;
+
+        //     // Procesar cada página
+        //     for (let i = 0; i < pages.length; i++) {
+        //         const page = pages[i];
+
+        //         // Cambiar a la página actual temporalmente para capturarla
+        //         setCurrentPage(i);
+
+        //         // Esperar un momento para que se renderice
+        //         await new Promise(resolve => setTimeout(resolve, 500));
+
+        //         try {
+        //             // Capturar la página con alta calidad para PDF
+        //             const canvas = await captureCurrentWorkspace({ type: 'pdf' });
+
+        //             if (canvas) {
+        //                 // Calcular dimensiones para mantener aspecto y llenar la página
+        //                 const canvasAspect = canvas.width / canvas.height;
+        //                 const pageAspect = pageWidthPt / pageHeightPt;
+
+        //                 let imgWidth, imgHeight, offsetX = 0, offsetY = 0;
+
+        //                 if (canvasAspect > pageAspect) {
+        //                     // La imagen es más ancha, ajustar por ancho
+        //                     imgWidth = pageWidthPt;
+        //                     imgHeight = pageWidthPt / canvasAspect;
+        //                     offsetY = (pageHeightPt - imgHeight) / 2;
+        //                 } else {
+        //                     // La imagen es más alta, ajustar por alto
+        //                     imgHeight = pageHeightPt;
+        //                     imgWidth = pageHeightPt * canvasAspect;
+        //                     offsetX = (pageWidthPt - imgWidth) / 2;
+        //                 }
+
+        //                 // 🖨️ CALIDAD PROFESIONAL: PNG sin compresión para impresión
+        //                 const imgData = canvas.toDataURL('image/png', 1.0);
+        //                 console.log('th [7074]:', imgData)
+
+        //                 // Agregar página si no es la primera
+        //                 if (i > 0) {
+        //                     pdf.addPage([pageWidthPt, pageHeightPt]);
+        //                 }
+
+        //                 // 🖨️ Agregar imagen PNG de alta calidad al PDF
+        //                 pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+
+        //             } else {
+        //                 console.warn(`⚠️ No se pudo capturar la página ${i + 1}`);
+
+        //                 // Agregar página en blanco si falla la captura
+        //                 if (i > 0) {
+        //                     pdf.addPage([pageWidthPt, pageHeightPt]);
+        //                 }
+
+        //                 // Agregar texto de error
+        //                 pdf.setFontSize(12);
+        //                 pdf.text(`Error al renderizar página ${i + 1}`, pageWidthPt / 2, pageHeightPt / 2, { align: 'center' });
+        //             }
+        //         } catch (pageError) {
+        //             console.error(`❌ Error procesando página ${i + 1}:`, pageError);
+
+        //             // Agregar página de error
+        //             if (i > 0) {
+        //                 pdf.addPage([pageWidthPt, pageHeightPt]);
+        //             }
+
+        //             pdf.setFontSize(12);
+        //             pdf.text(`Error al procesar página ${i + 1}`, pageWidthPt / 2, pageHeightPt / 2, { align: 'center' });
+        //         }
+
+        //         processedPages++;
+        //         updateProgress(processedPages);
+
+        //         // Pausa pequeña entre páginas para no sobrecargar el navegador
+        //         await new Promise(resolve => setTimeout(resolve, 200));
+        //     }
+
+        //     // Restaurar página original
+        //     setCurrentPage(originalCurrentPage);
+
+        //     // Generar nombre del archivo
+        //     const fileName = `${itemData?.name || 'album'}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+        //     // Descargar el PDF
+        //     pdf.save(fileName);
+
+        //     // Remover progreso
+        //     document.body.removeChild(progressContainer);
+
+
+        //     // Mostrar mensaje de éxito
+        //     const successMsg = document.createElement('div');
+        //     successMsg.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg z-50';
+        //     successMsg.innerHTML = `
+        //         <div class="flex items-center">
+        //             <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        //                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+        //             </svg>
+        //             <span>PDF de alta calidad generado: ${fileName}</span>
+        //         </div>
+        //     `;
+        //     document.body.appendChild(successMsg);
+
+        //     setTimeout(() => {
+        //         if (document.body.contains(successMsg)) {
+        //             document.body.removeChild(successMsg);
+        //         }
+        //     }, 5000);
+
+        //     return fileName;
+
+        // } catch (error) {
+        //     console.error('❌ Error generando PDF:', error);
+
+        //     // Remover progreso si existe
+        //     const progressElement = document.getElementById('pdf-progress');
+        //     if (progressElement) {
+        //         document.body.removeChild(progressElement);
+        //     }
+
+        //     // Mostrar error
+        //     const errorMsg = document.createElement('div');
+        //     errorMsg.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg z-50';
+        //     errorMsg.innerHTML = `
+        //         <div class="flex items-center">
+        //             <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        //                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+        //             </svg>
+        //             <span>Error al generar PDF: ${error.message}</span>
+        //         </div>
+        //     `;
+        //     document.body.appendChild(errorMsg);
+
+        //     setTimeout(() => {
+        //         if (document.body.contains(errorMsg)) {
+        //             document.body.removeChild(errorMsg);
+        //         }
+        //     }, 7000);
+
+        //     throw error;
+        // }
+
         try {
-            // Importar jsPDF dinámicamente
-            const { jsPDF } = await import('jspdf');
+            // Importar pdf-lib dinámicamente
+            const { PDFDocument } = await import('pdf-lib');
 
             // 🖨️ DIMENSIONES PROFESIONALES: Con sangrado para impresión
             let pageWidthCm = presetData?.width || 21; // A4 por defecto
@@ -6997,15 +7036,8 @@ export default function EditorLibro() {
             const pageWidthPt = printWidthCm * 28.35;
             const pageHeightPt = printHeightCm * 28.35;
 
-
-
-            // 🖨️ PDF PROFESIONAL: Sin compresión para máxima calidad de impresión
-            const pdf = new jsPDF({
-                orientation: pageWidthPt > pageHeightPt ? 'landscape' : 'portrait',
-                unit: 'pt',
-                format: [pageWidthPt, pageHeightPt],
-                compress: false // Sin compresión para calidad profesional
-            });
+            // Crear documento PDF
+            const pdfDoc = await PDFDocument.create();
 
             // Mostrar progreso
             const totalPages = pages.length;
@@ -7016,16 +7048,16 @@ export default function EditorLibro() {
             progressContainer.id = 'pdf-progress';
             progressContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             progressContainer.innerHTML = `
-                <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                    <h3 class="text-lg font-semibold mb-4">Generando PDF de alta calidad...</h3>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div id="pdf-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-2">
-                        <span id="current-page">0</span> de ${totalPages} páginas procesadas
-                    </p>
-                </div>
-            `;
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold mb-4">Generando PDF de alta calidad...</h3>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="pdf-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p class="text-sm text-gray-600 mt-2">
+                <span id="current-page">0</span> de ${totalPages} páginas procesadas
+            </p>
+        </div>
+    `;
             document.body.appendChild(progressContainer);
 
             const updateProgress = (current) => {
@@ -7039,7 +7071,7 @@ export default function EditorLibro() {
 
             // Procesar cada página
             for (let i = 0; i < pages.length; i++) {
-                const page = pages[i];
+                const page = pdfDoc.addPage([pageWidthPt, pageHeightPt]);
 
                 // Cambiar a la página actual temporalmente para capturarla
                 setCurrentPage(i);
@@ -7072,38 +7104,32 @@ export default function EditorLibro() {
 
                         // 🖨️ CALIDAD PROFESIONAL: PNG sin compresión para impresión
                         const imgData = canvas.toDataURL('image/png', 1.0);
-                        // console.log('th [7074]:', imgData)
+                        const imgBytes = await fetch(imgData).then(res => res.arrayBuffer());
+                        const embeddedImage = await pdfDoc.embedPng(imgBytes);
 
-                        // Agregar página si no es la primera
-                        if (i > 0) {
-                            pdf.addPage([pageWidthPt, pageHeightPt]);
-                        }
-
-                        // 🖨️ Agregar imagen PNG de alta calidad al PDF
-                        pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+                        // Dibujar imagen en la página
+                        page.drawImage(embeddedImage, {
+                            x: offsetX,
+                            y: offsetY,
+                            width: imgWidth,
+                            height: imgHeight,
+                        });
 
                     } else {
                         console.warn(`⚠️ No se pudo capturar la página ${i + 1}`);
-
-                        // Agregar página en blanco si falla la captura
-                        if (i > 0) {
-                            pdf.addPage([pageWidthPt, pageHeightPt]);
-                        }
-
-                        // Agregar texto de error
-                        pdf.setFontSize(12);
-                        pdf.text(`Error al renderizar página ${i + 1}`, pageWidthPt / 2, pageHeightPt / 2, { align: 'center' });
+                        page.drawText(`Error al renderizar página ${i + 1}`, {
+                            x: pageWidthPt / 2 - 50,
+                            y: pageHeightPt / 2,
+                            size: 12,
+                        });
                     }
                 } catch (pageError) {
                     console.error(`❌ Error procesando página ${i + 1}:`, pageError);
-
-                    // Agregar página de error
-                    if (i > 0) {
-                        pdf.addPage([pageWidthPt, pageHeightPt]);
-                    }
-
-                    pdf.setFontSize(12);
-                    pdf.text(`Error al procesar página ${i + 1}`, pageWidthPt / 2, pageHeightPt / 2, { align: 'center' });
+                    page.drawText(`Error al procesar página ${i + 1}`, {
+                        x: pageWidthPt / 2 - 50,
+                        y: pageHeightPt / 2,
+                        size: 12,
+                    });
                 }
 
                 processedPages++;
@@ -7120,11 +7146,15 @@ export default function EditorLibro() {
             const fileName = `${itemData?.name || 'album'}_${new Date().toISOString().split('T')[0]}.pdf`;
 
             // Descargar el PDF
-            pdf.save(fileName);
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
 
             // Remover progreso
             document.body.removeChild(progressContainer);
-
 
             // Mostrar mensaje de éxito
             const successMsg = document.createElement('div');
@@ -7177,6 +7207,7 @@ export default function EditorLibro() {
 
             throw error;
         }
+
     }, [pages, currentPage, setCurrentPage, captureCurrentWorkspace, presetData, itemData]);
 
     // Exponer funciones útiles globalmente para uso externo

@@ -1,1 +1,0 @@
-var i=Object.defineProperty;var o=(e,s,a)=>s in e?i(e,s,{enumerable:!0,configurable:!0,writable:!0,value:a}):e[s]=a;var t=(e,s,a)=>o(e,typeof s!="symbol"?s+"":s,a);import{B as f}from"./BasicRest-C4m6wu80.js";class r extends f{constructor(){super(...arguments);t(this,"path","messages");t(this,"is_use_notify",!1)}}export{r as M};

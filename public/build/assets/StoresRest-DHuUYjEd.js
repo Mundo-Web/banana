@@ -1,1 +1,0 @@
-var r=Object.defineProperty;var o=(e,s,t)=>s in e?r(e,s,{enumerable:!0,configurable:!0,writable:!0,value:t}):e[s]=t;var a=(e,s,t)=>o(e,typeof s!="symbol"?s+"":s,t);import{B as i}from"./BasicRest-C4m6wu80.js";class c extends i{constructor(){super(...arguments);a(this,"path","admin/stores");a(this,"hasFiles",!0)}}export{c as S};
