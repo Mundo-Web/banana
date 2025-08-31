@@ -1,0 +1,13 @@
+.thumbnail .resize-control-handle,
+.thumbnail [data-cell-id] [data-upload],
+.thumbnail [data-editor] {
+    display: none !important;
+}
+
+.thumbnail img,
+.thumbnail .resize-manipulation-indicator ,
+.thumbnail [data-element-type],
+.thumbnail [data-cell-id] {
+    border: none !important;
+    box-shadow: none !important;
+}

@@ -71,24 +71,21 @@ const BookPreviewModal = ({
     pageThumbnails = {},
     addAlbumToCart,
     workspaceDimensions = { width: 800, height: 600 },
-    layouts = [],
-    presetData = null,
     projectData = null,
     itemData = null,
     // 🎯 NUEVO: Tipo de contenido inteligente
     contentType = { type: 'album', name: 'Álbum', description: 'Vista de Álbum', icon: '📖' },
-    categorizedPages = { cover: [], content: [], final: [] },
-    // 🚀 NUEVO: Estado de carga del álbum
     albumLoadingState = { isLoading: false, loadedImages: 0, totalImages: 0, message: '' }
 }) => {
+
+    console.log('[Page THS]',pageThumbnails)
+
     const [currentPage, setCurrentPage] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [generatedThumbnails, setGeneratedThumbnails] = useState({});
     const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
     const [pdfGenerated, setPdfGenerated] = useState(false);
-    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-    const [purchaseStep, setPurchaseStep] = useState(0);
     const [pdfGenerationInProgress, setPdfGenerationInProgress] = useState(false); // 🔧 NUEVO: Prevenir múltiples generaciones
     const [albumPreparationModal, setAlbumPreparationModal] = useState({
         isOpen: false,
@@ -299,199 +296,6 @@ const BookPreviewModal = ({
         }
     };
 
-    // Reemplazar la función drawImageCover por una versión fiel a object-fit: cover
-    function drawImageCover(ctx, img, dx, dy, dWidth, dHeight) {
-        const sWidth = img.width;
-        const sHeight = img.height;
-        const dRatio = dWidth / dHeight;
-        const sRatio = sWidth / sHeight;
-        let sx = 0, sy = 0, sw = sWidth, sh = sHeight;
-        if (dRatio > sRatio) {
-            // El área destino es más ancha: recorta arriba/abajo
-            sh = sWidth / dRatio;
-            sy = (sHeight - sh) / 2;
-        } else {
-            // El área destino es más alta: recorta a los lados
-            sw = sHeight * dRatio;
-            sx = (sWidth - sw) / 2;
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dWidth, dHeight);
-    }
-
-    function parseGridTemplate(template) {
-        const colsMatch = template.match(/grid-cols-(\d+)/);
-        const rowsMatch = template.match(/grid-rows-(\d+)/);
-        const gapMatch = template.match(/gap-(\d+)/);
-        return {
-            cols: colsMatch ? parseInt(colsMatch[1], 10) : 1,
-            rows: rowsMatch ? parseInt(rowsMatch[1], 10) : 1,
-            gap: gapMatch ? parseInt(gapMatch[1], 10) * 4 : 0 // tailwind gap-1 = 0.25rem = 4px
-        };
-    }
-
-    function parseCellSpan(styleStr, key, defaultVal = 1) {
-        const match = styleStr && styleStr.match(new RegExp(`${key}-span-(\\d+)`));
-        return match ? parseInt(match[1], 10) : defaultVal;
-    }
-
-    function findFirstFreeSpot(grid, rows, cols, rowSpan, colSpan) {
-        for (let row = 0; row <= rows - rowSpan; row++) {
-            for (let col = 0; col <= cols - colSpan; col++) {
-                let canPlace = true;
-                for (let r = row; r < row + rowSpan; r++) {
-                    for (let c = col; c < col + colSpan; c++) {
-                        if (grid[r][c] !== null) {
-                            canPlace = false;
-                            break;
-                        }
-                    }
-                    if (!canPlace) break;
-                }
-                if (canPlace) return { row, col };
-            }
-        }
-        return null;
-    }
-
-    function getLayoutCellPositions(layout, workspaceDimensions, pageCells) {
-        const { cols, rows, gap } = parseGridTemplate(layout.template);
-        const padding = layout.style && layout.style.padding ? parseInt(layout.style.padding) : 0;
-        const width = workspaceDimensions.width - 2 * padding;
-        const height = workspaceDimensions.height - 2 * padding;
-        const cellWidth = (width - gap * (cols - 1)) / cols;
-        const cellHeight = (height - gap * (rows - 1)) / rows;
-        const grid = Array.from({ length: rows }, () => Array(cols).fill(false));
-        const positions = {};
-        for (let i = 0; i < layout.cells; i++) {
-            const styleStr = layout.cellStyles && layout.cellStyles[i] ? layout.cellStyles[i] : '';
-            const colSpan = parseCellSpan(styleStr, 'col', 1);
-            const rowSpan = parseCellSpan(styleStr, 'row', 1);
-            let placed = false;
-            for (let r = 0; r <= rows - rowSpan && !placed; r++) {
-                for (let c = 0; c <= cols - colSpan && !placed; c++) {
-                    let canPlace = true;
-                    for (let rr = r; rr < r + rowSpan; rr++) {
-                        for (let cc = c; cc < c + colSpan; cc++) {
-                            if (grid[rr][cc]) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
-                        if (!canPlace) break;
-                    }
-                    if (canPlace) {
-                        for (let rr = r; rr < r + rowSpan; rr++) {
-                            for (let cc = c; cc < c + colSpan; cc++) {
-                                grid[rr][cc] = true;
-                            }
-                        }
-                        const cellId = pageCells && pageCells[i] ? pageCells[i].id : i;
-                        positions[cellId] = {
-                            x: padding + c * (cellWidth + gap),
-                            y: padding + r * (cellHeight + gap),
-                            width: cellWidth * colSpan + gap * (colSpan - 1),
-                            height: cellHeight * rowSpan + gap * (rowSpan - 1)
-                        };
-                        placed = true;
-                    }
-                }
-            }
-            if (!placed) {
-                const cellId = pageCells && pageCells[i] ? pageCells[i].id : i;
-                console.warn(`[GRID-PLACEMENT] No se pudo ubicar la celda ${cellId}`);
-                positions[cellId] = { x: 0, y: 0, width: cellWidth, height: cellHeight };
-            }
-        }
-        return positions;
-    }
-
-    // Función para generar thumbnails de alta calidad
-    const generateHighQualityThumbnails = useCallback(async () => {
-        if (!pages || pages.length === 0 || !isOpen) return;
-
-        setIsGeneratingThumbnails(true);
-        setGeneratedThumbnails({});
-
-        const newThumbnails = {};
-        const scale = 4; // Factor de escala para alta resolución
-
-        // Función auxiliar para dibujar elementos en la posición correcta
-        const drawElementInCell = (ctx, element, cellPosition, scale) => {
-            if (!element || !element.image) return;
-
-            const img = new Image();
-            img.src = element.image;
-
-            img.onload = () => {
-                // Calcular posición y tamaño del elemento dentro de la celda
-                const elementX = cellPosition.x + element.x * scale;
-                const elementY = cellPosition.y + element.y * scale;
-                const elementWidth = element.width * scale;
-                const elementHeight = element.height * scale;
-
-                // Dibujar imagen usando la función drawImageCover
-                drawImageCover(ctx, img, elementX, elementY, elementWidth, elementHeight);
-            };
-        };
-
-        // Función para generar thumbnail de una página
-        const generatePageThumbnail = async (page, index) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-
-            // Establecer dimensiones del canvas
-            canvas.width = workspaceDimensions.width * scale;
-            canvas.height = workspaceDimensions.height * scale;
-
-            // Dibujar fondo de la página
-            if (presetData && presetData.final_layer_image) {
-                const bgImg = new Image();
-                bgImg.src = presetData.final_layer_image;
-                bgImg.onload = () => {
-                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-                };
-            }
-
-            // Obtener posiciones de las celdas
-            const layout = layouts.find(l => l.id === page.layoutId);
-            if (!layout) return;
-
-            const cellPositions = getLayoutCellPositions(layout, workspaceDimensions, page.cells);
-
-            // Dibujar elementos en sus celdas correspondientes
-            page.cells.forEach(cell => {
-                const cellPosition = cellPositions[cell.id];
-                if (cellPosition) {
-                    cell.elements.forEach(element => {
-                        drawElementInCell(ctx, element, cellPosition, scale);
-                    });
-                }
-            });
-
-            // 🔧 FIX: Usar page.id como clave en lugar de index para thumbnails
-            const thumbnail = canvas.toDataURL('image/jpeg', 0.9);
-            return { [page.id]: thumbnail };
-        };
-
-        // Generar thumbnails para todas las páginas
-        const promises = pages.map((page, index) => generatePageThumbnail(page, index));
-        const thumbnails = await Promise.all(promises);
-
-        // 🔧 DEBUG: Log para verificar estructura de thumbnails generados
-
-
-        // Combinar todos los thumbnails
-        thumbnails.forEach(thumb => {
-            Object.assign(newThumbnails, thumb);
-        });
-
-
-
-        // Actualizar estado
-        setGeneratedThumbnails(newThumbnails);
-        setIsGeneratingThumbnails(false);
-    }, [pages, isOpen, workspaceDimensions, layouts, presetData]);
-
     // 🔍 Exponer ID del proyecto para debugging
     useEffect(() => {
         if (projectData?.id) {
@@ -499,38 +303,6 @@ const BookPreviewModal = ({
             console.log('🔍 [DEBUG] Proyecto cargado:', projectData.id);
         }
     }, [projectData?.id]);
-
-    // Función para preparar los datos comunes para la generación de PDF
-    const preparePDFData = () => {
-        // Crear una versión simplificada de las páginas para el backend
-        const simplifiedPages = pages.map((page, index) => ({
-            id: page.id || `page-${index}`,
-            index: index
-        }));
-
-        // Asegurarse de que las dimensiones originales están correctamente enviadas
-        const enhancedDimensions = {
-            ...workspaceDimensions,
-            // Garantizar que originalWidth y originalHeight siempre estén presentes en mm
-            originalWidth: workspaceDimensions.originalWidth ||
-                (itemData?.dimensions?.width ? parseFloat(itemData.dimensions.width) : 297), // Valor por defecto A4 horizontal
-            originalHeight: workspaceDimensions.originalHeight ||
-                (itemData?.dimensions?.height ? parseFloat(itemData.dimensions.height) : 210), // Valor por defecto A4 horizontal
-            // Asegurar que se envían como números, no como strings
-            width: parseInt(workspaceDimensions.width || 800),
-            height: parseInt(workspaceDimensions.height || 600)
-        };
-
-        return {
-            format: projectData?.format || 'album',
-            quality: 'high',
-            pages: simplifiedPages,
-            pages_count: pages.length,
-            workspace_dimensions: enhancedDimensions,
-            product_dimensions: itemData?.dimensions || {},
-            use_pdf_thumbnails: true
-        };
-    };
 
     // Función para generar PDF directamente en el frontend usando las imágenes del flipbook
     const generatePDFSilently = async () => {
@@ -552,94 +324,7 @@ const BookPreviewModal = ({
         setPdfGenerationInProgress(true);
         console.log('🚀 [FRONTEND-PDF] Iniciando generación de PDF en el frontend...');
 
-        // try {
-        //     // Usar las mismas imágenes que estamos mostrando en el flipbook
-        //     const imagesToUse = Object.keys(activeThumbnails).length > 0 ? activeThumbnails : generatedThumbnails;
-
-        //     console.log('🔍 [FRONTEND-PDF] activeThumbnails:', Object.keys(activeThumbnails).length, 'elementos');
-        //     console.log('🔍 [FRONTEND-PDF] generatedThumbnails:', Object.keys(generatedThumbnails).length, 'elementos');
-        //     console.log('🔍 [FRONTEND-PDF] imagesToUse:', Object.keys(imagesToUse).length, 'elementos');
-
-        //     if (Object.keys(imagesToUse).length === 0) {
-        //         console.warn('⚠️ [FRONTEND-PDF] No hay imágenes disponibles para el PDF');
-        //         console.log('⚠️ [FRONTEND-PDF] activeThumbnails:', activeThumbnails);
-        //         console.log('⚠️ [FRONTEND-PDF] generatedThumbnails:', generatedThumbnails);
-        //         return false;
-        //     }
-
-        //     console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
-
-        //     // Usar jsPDF ya importado al inicio del archivo
-        //     console.log('📦 [FRONTEND-PDF] Verificando jsPDF:', typeof jsPDF);
-
-        //     // Configurar dimensiones del PDF (usar las del workspace)
-        //     const pdfWidthMm4 = workspaceDimensions.originalWidth || 210;
-        //     const pdfHeightMm4 = workspaceDimensions.originalHeight || 297;
-
-        //     // Configurar dimensiones del PDF (usar las del workspace)
-        //     const pdfWidthMm = pdfWidthMm4/6;
-        //     const pdfHeightMm = pdfHeightMm4/6;
-        //     console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthMm + 'mm x ' + pdfHeightMm + 'mm');
-
-        //     // Crear PDF
-        //     const pdf = new jsPDF({
-        //         orientation: pdfWidthMm > pdfHeightMm ? 'landscape' : 'portrait',
-        //         unit: 'mm',
-        //         format: [pdfWidthMm, pdfHeightMm]
-        //     });
-
-        //     // Obtener páginas ordenadas
-        //     const bookPages = createBookPages();
-        //     let pageCount = 0;
-
-        //     for (const page of bookPages) {
-        //         const imageUrl = imagesToUse[page.originalId || page.id];
-
-        //         if (imageUrl) {
-        //             try {
-        //                 // Si es la primera página, no agregar nueva página
-        //                 if (pageCount > 0) {
-        //                     pdf.addPage([pdfWidthMm, pdfHeightMm]);
-        //                 }
-
-        //                 // Agregar imagen a la página
-        //                 pdf.addImage(imageUrl, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm);
-        //                 pageCount++;
-
-        //                 console.log(`📄 [FRONTEND-PDF] Página ${pageCount} agregada al PDF`);
-        //             } catch (imageError) {
-        //                 console.warn(`⚠️ [FRONTEND-PDF] Error agregando página ${pageCount + 1}:`, imageError);
-        //             }
-        //         }
-        //     }
-
-        //     if (pageCount === 0) {
-        //         console.error('❌ [FRONTEND-PDF] No se pudo agregar ninguna página al PDF');
-        //         return false;
-        //     }
-
-        //     // Generar PDF como blob
-        //     const pdfBlob = pdf.output('blob');
-        //     console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
-
-        //     // Subir PDF al servidor
-        //     console.log('🚀 [FRONTEND-PDF] Iniciando subida al servidor...');
-        //     const uploadResult = await uploadPDFToServer(pdfBlob);
-        //     console.log('🏁 [FRONTEND-PDF] Resultado de subida:', uploadResult);
-        //     return uploadResult;
-
-        // } catch (error) {
-        //     console.error('❌ [FRONTEND-PDF] Error generando PDF:', error);
-        //     return false;
-        // } finally {
-        //     setPdfGenerationInProgress(false);
-        //     console.log('🏁 [FRONTEND-PDF] Proceso finalizado');
-        // }
-
         try {
-            // Importar pdf-lib
-            const { PDFDocument } = await import('pdf-lib');
-
             // Usar las mismas imágenes que estamos mostrando en el flipbook
             const imagesToUse = Object.keys(activeThumbnails).length > 0 ? activeThumbnails : generatedThumbnails;
 
@@ -656,52 +341,43 @@ const BookPreviewModal = ({
 
             console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
 
+            // Usar jsPDF ya importado al inicio del archivo
+            console.log('📦 [FRONTEND-PDF] Verificando jsPDF:', typeof jsPDF);
+
             // Configurar dimensiones del PDF (usar las del workspace)
             const pdfWidthMm4 = workspaceDimensions.originalWidth || 210;
             const pdfHeightMm4 = workspaceDimensions.originalHeight || 297;
 
-            // Escalar dimensiones
+            // Configurar dimensiones del PDF (usar las del workspace)
             const pdfWidthMm = pdfWidthMm4 / 6;
             const pdfHeightMm = pdfHeightMm4 / 6;
             console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthMm + 'mm x ' + pdfHeightMm + 'mm');
 
-            // Convertir mm a puntos (1 mm = 2.83465 pt)
-            const pdfWidthPt = pdfWidthMm * 2.83465;
-            const pdfHeightPt = pdfHeightMm * 2.83465;
-
-            // Crear documento PDF
-            const pdfDoc = await PDFDocument.create();
+            // Crear PDF
+            const pdf = new jsPDF({
+                orientation: pdfWidthMm > pdfHeightMm ? 'landscape' : 'portrait',
+                unit: 'mm',
+                format: [pdfWidthMm, pdfHeightMm]
+            });
 
             // Obtener páginas ordenadas
             const bookPages = createBookPages();
             let pageCount = 0;
 
-            for (const pageData of bookPages) {
-                const imageUrl = imagesToUse[pageData.originalId || pageData.id];
+            for (const page of bookPages) {
+                const imageUrl = imagesToUse[page.originalId || page.id];
 
                 if (imageUrl) {
                     try {
-                        // Crear nueva página
-                        const page = pdfDoc.addPage([pdfWidthPt, pdfHeightPt]);
-
-                        // Descargar la imagen y embeberla
-                        const imgBytes = await fetch(imageUrl).then(res => res.arrayBuffer());
-                        let embeddedImage;
-                        if (imageUrl.startsWith('data:image/png')) {
-                            embeddedImage = await pdfDoc.embedPng(imgBytes);
-                        } else {
-                            embeddedImage = await pdfDoc.embedJpg(imgBytes);
+                        // Si es la primera página, no agregar nueva página
+                        if (pageCount > 0) {
+                            pdf.addPage([pdfWidthMm, pdfHeightMm]);
                         }
 
-                        // Dibujar imagen en la página
-                        page.drawImage(embeddedImage, {
-                            x: 0,
-                            y: 0,
-                            width: pdfWidthPt,
-                            height: pdfHeightPt,
-                        });
-
+                        // Agregar imagen a la página
+                        pdf.addImage(imageUrl, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm);
                         pageCount++;
+
                         console.log(`📄 [FRONTEND-PDF] Página ${pageCount} agregada al PDF`);
                     } catch (imageError) {
                         console.warn(`⚠️ [FRONTEND-PDF] Error agregando página ${pageCount + 1}:`, imageError);
@@ -715,8 +391,7 @@ const BookPreviewModal = ({
             }
 
             // Generar PDF como blob
-            const pdfBytes = await pdfDoc.save();
-            const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const pdfBlob = pdf.output('blob');
             console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
 
             // Subir PDF al servidor
@@ -732,7 +407,6 @@ const BookPreviewModal = ({
             setPdfGenerationInProgress(false);
             console.log('🏁 [FRONTEND-PDF] Proceso finalizado');
         }
-
     };
 
     // Función para subir el PDF generado al servidor
@@ -820,51 +494,6 @@ const BookPreviewModal = ({
         }
     };
 
-    // Función para generar PDF con interacción del usuario (con alertas y descarga)
-    const generatePDF = async () => {
-        if (!projectData?.id) {
-            alert('No se ha cargado ningún proyecto.');
-            return;
-        }
-
-        setIsGeneratingPDF(true);
-
-        try {
-            const pdfData = preparePDFData();
-
-            const response = await fetch(`/api/customer/projects/${projectData.id}/generate-pdf`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                },
-                body: JSON.stringify(pdfData)
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                if (blob.type === 'application/pdf') {
-                    saveAs(blob, `proyecto-${projectData.id}.pdf`);
-                    alert('PDF generado y descargado exitosamente.');
-                } else {
-                    const errorData = await response.json();
-                    alert(errorData.message || 'Error al generar el PDF.');
-                }
-            } else {
-                const errorData = await response.json();
-                alert(errorData.message || 'No se pudo generar el PDF.');
-            }
-        } catch (error) {
-            console.error('Error al exportar el PDF:', error);
-            alert('Ocurrió un error de red al generar el PDF.');
-        } finally {
-            setIsGeneratingPDF(false);
-        }
-    };
-
-
-    // Funciones auxiliares
-
 
     // Efectos de React
     useEffect(() => {
@@ -899,146 +528,6 @@ const BookPreviewModal = ({
         }
     }, [isOpen]);
 
-
-
-
-
-    // Función para crear un placeholder elegante para una página específica
-    const createElegantPlaceholderForPage = (page, workspaceDimensions) => {
-
-        // Calcular dimensiones del preview con la proporción exacta del workspace
-        const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
-        const previewBaseWidht = 800;
-        const previewHeight = previewBaseWidht;
-        const previewWidth = Math.round(previewHeight * workspaceAspectRatio);
-
-        // HiDPI fix
-        const ratio = window.devicePixelRatio || 1;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = previewWidth * ratio;
-        canvas.height = previewHeight * ratio;
-        canvas.style.width = `${previewWidth}px`;
-        canvas.style.height = `${previewHeight}px`;
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-        // Fondo blanco limpio
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, previewWidth, previewHeight);
-
-        // Borde elegante
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(20, 20, previewWidth - 40, previewHeight - 40);
-
-        // Configuración de texto
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // Información de la página
-        let pageTitle = '';
-        let pageIcon = '';
-        let pageSubtitle = '';
-        let backgroundColor = '#f8fafc';
-        let iconColor = '#64748b';
-
-        switch (page.type) {
-            case 'cover':
-                pageTitle = 'Portada';
-                pageIcon = '📚';
-                pageSubtitle = 'Página de inicio del álbum';
-                backgroundColor = '#fef7ef';
-                iconColor = '#ea580c';
-                break;
-            case 'final':
-                pageTitle = 'Contraportada';
-                pageIcon = '📖';
-                pageSubtitle = 'Página final del álbum';
-                backgroundColor = '#f0f9ff';
-                iconColor = '#0284c7';
-                break;
-            case 'content':
-                pageTitle = `Página ${page.pageNumber || 'de contenido'}`;
-                pageIcon = '📄';
-                pageSubtitle = 'Página de contenido';
-                backgroundColor = '#f0fdf4';
-                iconColor = '#16a34a';
-                break;
-            default:
-                pageTitle = `Página ${page.pageNumber || '?'}`;
-                pageIcon = '📄';
-                pageSubtitle = 'Contenido del álbum';
-                backgroundColor = '#f8fafc';
-                iconColor = '#64748b';
-        }
-
-        // Fondo de color suave
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(40, 40, previewWidth - 80, previewHeight - 80);
-
-        // Icono principal (emoji grande)
-        ctx.font = `${Math.min(previewWidth, previewHeight) * 0.12}px Arial`;
-        ctx.fillText(pageIcon, previewWidth / 2, previewHeight / 2 - 50);
-
-        // Título de la página
-        ctx.font = `bold ${Math.min(previewWidth, previewHeight) * 0.035}px Arial`;
-        ctx.fillStyle = '#1e293b';
-        ctx.fillText(pageTitle, previewWidth / 2, previewHeight / 2 + 15);
-
-        // Subtítulo
-        ctx.font = `${Math.min(previewWidth, previewHeight) * 0.022}px Arial`;
-        ctx.fillStyle = '#64748b';
-        ctx.fillText(pageSubtitle, previewWidth / 2, previewHeight / 2 + 45);
-
-        // Información adicional si hay layout
-        if (page.layout && layouts.length > 0) {
-            const layout = layouts.find(l => l.id === page.layout);
-            if (layout) {
-                ctx.font = `${Math.min(previewWidth, previewHeight) * 0.018}px Arial`;
-                ctx.fillStyle = '#94a3b8';
-                ctx.fillText(`Layout: ${layout.name || 'Personalizado'}`, previewWidth / 2, previewHeight / 2 + 75);
-            }
-        }
-
-        // Decoración sutil en las esquinas
-        ctx.strokeStyle = iconColor;
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-
-        // Esquinas decorativas
-        const cornerSize = 15;
-        const margin = 30;
-
-        // Esquina superior izquierda
-        ctx.beginPath();
-        ctx.moveTo(margin, margin + cornerSize);
-        ctx.lineTo(margin, margin);
-        ctx.lineTo(margin + cornerSize, margin);
-        ctx.stroke();
-
-        // Esquina superior derecha
-        ctx.beginPath();
-        ctx.moveTo(previewWidth - margin - cornerSize, margin);
-        ctx.lineTo(previewWidth - margin, margin);
-        ctx.lineTo(previewWidth - margin, margin + cornerSize);
-        ctx.stroke();
-
-        // Esquina inferior izquierda
-        ctx.beginPath();
-        ctx.moveTo(margin, previewHeight - margin - cornerSize);
-        ctx.lineTo(margin, previewHeight - margin);
-        ctx.lineTo(margin + cornerSize, previewHeight - margin);
-        ctx.stroke();
-
-        // Esquina inferior derecha
-        ctx.beginPath();
-        ctx.moveTo(previewWidth - margin - cornerSize, previewHeight - margin);
-        ctx.lineTo(previewWidth - margin, previewHeight - margin);
-        ctx.lineTo(previewWidth - margin, previewHeight - margin - cornerSize);
-        ctx.stroke();
-
-        return canvas.toDataURL('image/png', 1.0);
-    };
 
     // Usar thumbnails en este orden de prioridad:
     // 1. Thumbnails proporcionados (de Editor.jsx)
@@ -1174,7 +663,7 @@ const BookPreviewModal = ({
     const contentOnlyMode = bookPages.length > 0 && !hasRealCover &&
         !bookPages.some(p => p.pageType === 'final');
 
-
+    console.log('Book pages:', bookPages)
 
     // Si no hay páginas, mostrar mensaje
     if (bookPages.length === 0) {
@@ -1210,6 +699,8 @@ const BookPreviewModal = ({
             </Modal>
         );
     }
+
+    console.log('[THS]:',activeThumbnails);
 
     return (
         <Modal
@@ -1366,7 +857,7 @@ const BookPreviewModal = ({
                             const thumbnailKey = page.originalId || page.id;
                             const hasThumbnail = !!activeThumbnails[thumbnailKey];
 
-
+                            // console.log(`Página ${pageIdx + 1}:`, page)
 
                             return (
                                 <div
@@ -1386,7 +877,13 @@ const BookPreviewModal = ({
                                     }}
                                 >
                                     {/* Página individual */}
-                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div className={`border-2 ${pageIdx % 2? 'rounded-l-xl': 'rounded-r-xl'} overflow-hidden`} style={{ 
+                                        width: '100%', 
+                                        height: '100%', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                    }}>
                                         {page.isBlankPage ? (
                                             // 📄 PÁGINA EN BLANCO: Para correcto posicionamiento de tapas
                                             <div style={{

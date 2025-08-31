@@ -2,13 +2,9 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import html2canvas from 'html2canvas'; // Para captura de alta calidad
-import * as htmlToImage from "html-to-image";
 
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
-
-import '/resources/css/thumbnail.css'
-
 
 // ⚡ OPTIMIZACIÓN: Sistema de logging inteligente
 const isServer = typeof window === 'undefined';
@@ -223,7 +219,9 @@ import {
     Layout,
     Filter,
 } from "lucide-react";
+import { saveAs } from "file-saver";
 
+import jsPDF from "jspdf";
 import { toast, Toaster } from "sonner";
 import { Local } from "sode-extend-react";
 
@@ -312,6 +310,69 @@ const calculateCellDimensions = (layout, cellIndex, workspaceDimensions) => {
         height: cellHeight
     };
 };
+
+// �🚀 OPTIMIZACIÓN: Componente ThumbnailImage mejorado con lazy loading y cache
+const ThumbnailImage = React.memo(({ pageId, thumbnail, altText, type }) => {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
+
+    if (thumbnail && !imageError) {
+        return (
+            <div className="relative w-full h-full">
+                {!imageLoaded && (
+                    <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center">
+                        <div className="w-8 h-8 bg-gray-300 rounded"></div>
+                    </div>
+                )}
+                <img
+                    src={thumbnail}
+                    alt={altText}
+                    className={`w-full h-full object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+                        }`}
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => setImageError(true)}
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                        imageRendering: 'optimizeQuality'
+                    }}
+                />
+
+                {/* Indicador de optimización Blob URL (solo en desarrollo) */}
+                {process.env.NODE_ENV === 'development' && thumbnail && (
+                    <div className="absolute bottom-1 right-1 text-xs bg-black/70 text-white px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        {thumbnail.startsWith('blob:') ? '🔗 BLOB' : '📄 DATA'}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Fallback placeholder
+    const PlaceholderIcon = type === 'cover' || type === 'final' ? Book :
+        () => (
+            <div className="grid grid-cols-2 gap-0.5 w-8 h-8">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="bg-gray-300 rounded-sm"></div>
+                ))}
+            </div>
+        );
+
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <div className="text-center text-gray-400">
+                <PlaceholderIcon className="w-8 h-8 mx-auto mb-1" />
+                <span className="text-xs">Generando...</span>
+            </div>
+        </div>
+    );
+}, (prevProps, nextProps) => {
+    // 🚀 OPTIMIZACIÓN: Comparación personalizada para evitar re-renders innecesarios
+    return prevProps.pageId === nextProps.pageId &&
+        prevProps.thumbnail === nextProps.thumbnail &&
+        prevProps.altText === nextProps.altText &&
+        prevProps.type === nextProps.type;
+});
 
 // Componente para mostrar imágenes del proyecto con drag & drop
 const ProjectImageGallery = React.memo(({ images, onImageSelect, isLoading }) => {
@@ -471,6 +532,7 @@ export default function EditorLibro() {
     // Referencias para acceder a los valores actuales sin dependencias
     const saveQueueRef = useRef(saveQueue);
     const pageChangesRef = useRef(pageChanges);
+    const processingTimerRef = useRef(null);
     const loadingTimeoutRef = useRef(null); // 🚀 Timeout para loading states
     const thumbnailLoadTimeoutRef = useRef(null); // 🛡️ Timeout para debounce de carga de thumbnails
 
@@ -555,13 +617,56 @@ export default function EditorLibro() {
     const [selectedElement, setSelectedElement] = useState(null);
     const [selectedCell, setSelectedCell] = useState(null);
     const [activeTab, setActiveTab] = useState("pages");
+    const [filterTab, setFilterTab] = useState("basic");
     const [history, setHistory] = useState([JSON.stringify(pages)]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [previewMode, setPreviewMode] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [pageThumbnails, setPageThumbnails] = useState({});
 
+    // 🚀 OPTIMIZACIÓN: Convertir data URLs a Blob URLs automáticamente
+    const {
+        thumbnails: optimizedThumbnails,
+        isConverting: isConvertingThumbnails,
+        getStats: getThumbnailStats,
+        cleanup: cleanupThumbnail,
+        cleanupAll: cleanupAllThumbnails
+    } = useBlobThumbnails(pageThumbnails);
 
+    // 🔍 DEBUG: Exponer funciones globalmente para verificar el sistema
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.checkBlobOptimization = () => {
+                const stats = getThumbnailStats();
+                console.log('📊 [BLOB-OPTIMIZATION] Estadísticas del sistema:');
+                console.log(`📄 Data URLs originales: ${stats.dataCount}`);
+                console.log(`🔗 Blob URLs optimizados: ${stats.blobCount}`);
+                console.log(`📈 Tasa de conversión: ${stats.conversionRate}%`);
+                console.log(`💾 Memoria liberada: ~${stats.totalSizeMB} MB`);
+                console.log(`⚡ Convirtiendo: ${isConvertingThumbnails ? 'Sí' : 'No'}`);
+
+                // Mostrar comparación
+                console.log('\n🔍 [COMPARISON] Comparación de thumbnails:');
+                Object.entries(pageThumbnails).forEach(([pageId, originalUrl]) => {
+                    const optimizedUrl = optimizedThumbnails[pageId];
+                    if (originalUrl && optimizedUrl) {
+                        const isOptimized = optimizedUrl.startsWith('blob:');
+                        console.log(`📄 ${pageId}: ${isOptimized ? '✅ OPTIMIZADO' : '❌ SIN OPTIMIZAR'}`);
+                    }
+                });
+
+                return stats;
+            };
+
+            window.forceBlobConversion = () => {
+                console.log('🔄 [FORCE-CONVERSION] Forzando conversión de todos los thumbnails...');
+                // El hook se encarga automáticamente cuando cambian los pageThumbnails
+                setPageThumbnails(prev => ({ ...prev })); // Trigger re-conversion
+            };
+        }
+    }, [pageThumbnails, optimizedThumbnails, getThumbnailStats, isConvertingThumbnails]);
+
+    const [isPDFGenerating, setIsPDFGenerating] = useState(false);
     const [projectImages, setProjectImages] = useState([]); // Nueva: imágenes del proyecto
     const [projectImagesLoading, setProjectImagesLoading] = useState(false);
     const [imageCache, setImageCache] = useState(new Map()); // Cache para evitar re-renders
@@ -569,6 +674,20 @@ export default function EditorLibro() {
     const [thumbnailProgress, setThumbnailProgress] = useState(null); // ⚡ Estado de progreso de thumbnails
     const [isLoadingThumbnails, setIsLoadingThumbnails] = useState(false); // 🛡️ Control de llamadas en progreso
 
+    // ✅ MONITOREO: Sistema de filtros corregido
+    useEffect(() => {
+        logVPS('✅ [FILTERS] Tab actual:', activeTab);
+    }, [activeTab]);
+
+    // 🛡️ Función controlada para cambiar activeTab con logging
+    // const setActiveTabControlled = useCallback((newTab, reason = 'manual') => {
+    //     logVPS(`🔄 [ACTIVE_TAB] Cambiando de "${activeTab}" a "${newTab}" - Razón: ${reason}`);
+    //     if (newTab === 'filters' && reason !== 'manual') {
+    //         console.warn('🚨 [ACTIVE_TAB] Cambio automático a filters bloqueado!');
+    //         return;
+    //     }
+    //     setActiveTab(newTab);
+    // }, [activeTab]);
 
     // 🚨 SOLUCIÓN DE EMERGENCIA: Sistema global para forzar regeneración de thumbnails (SOLO CLIENTE)
     if (!isServer) {
@@ -580,6 +699,169 @@ export default function EditorLibro() {
         // 🎭 PRESERVAR FILTROS: Asegurarse que se apliquen todos los filtros correctamente
         window.PRESERVE_FILTERS = true; // Flag global para indicar que queremos mantener los filtros
     }
+
+    // Crear una función global para forzar la regeneración desde cualquier lugar
+    useEffect(() => {
+        // 🚀 CRÍTICO VPS: Solo en cliente
+        if (isServer) return;
+
+        // Exponer función de emergencia para forzar regeneración desde cualquier parte
+        window.forceRegenerateAllThumbnails = () => {
+            logVPS('💣 [EMERGENCIA-GLOBAL] Forzando regeneración de TODOS los thumbnails');
+            // Limpiar caché completamente
+            window.thumbnailCache = {};
+
+            // Marcar todas las páginas como necesitando regeneración
+            setPageChanges(prev => {
+                const newMap = new Map(prev);
+                // Marcar todas las páginas
+                pages.forEach((_, pageIndex) => {
+                    newMap.set(pageIndex, Date.now());
+                });
+                return newMap;
+            });
+
+            // Regenerar el thumbnail actual
+            logVPS('1️⃣ Regenerando página actual');
+            generateCurrentPageThumbnail(true).then(() => {
+                logVPS('✅ Primera regeneración completa');
+
+                // Bloquear cualquier regeneración automática por 5 segundos
+                window.BLOCK_AUTO_REGENERATION = true;
+
+                // Regeneración secundaria después de un breve retraso
+                setTimeout(() => {
+                    logVPS('2️⃣ Ejecutando segunda regeneración forzada');
+                    if (window.forceRegenerateThumbnail) {
+                        window.forceRegenerateThumbnail();
+                    }
+
+                    // Configurar protección contra resets posteriores
+                    window.THUMBNAIL_PROTECTED = true;
+
+                    // Desbloquear después de 5 segundos
+                    setTimeout(() => {
+                        window.BLOCK_AUTO_REGENERATION = false;
+                        logVPS('🔓 Regeneración automática desbloqueada');
+                    }, 5000);
+                }, 200);
+            }).catch(error => {
+                console.error('❌ Error en regeneración de emergencia:', error);
+            });
+        };
+
+        // Registrar método para uso desde consola
+    }, [pages]);
+
+    // �️ SISTEMA DE PROTECCIÓN DE THUMBNAILS CON FILTROS
+    useEffect(() => {
+        // Inicializar sistema de protección global
+        if (!window._protectedThumbnails) {
+            window._protectedThumbnails = new Set();
+            log('🛡️ [PROTECTION SYSTEM] Sistema de protección de thumbnails inicializado');
+        }
+
+        // Función para marcar thumbnail como protegido
+        window.protectThumbnail = (pageId) => {
+            window._protectedThumbnails.add(pageId);
+            logVPS(`🛡️ [PROTECT] Thumbnail ${pageId} marcado como protegido`);
+        };
+
+        // Función para desproteger thumbnail
+        window.unprotectThumbnail = (pageId) => {
+            window._protectedThumbnails.delete(pageId);
+            logVPS(`🔓 [UNPROTECT] Thumbnail ${pageId} desprotegido`);
+        };
+
+        // Función para verificar si está protegido
+        window.isThumbnailProtected = (pageId) => {
+            return window._protectedThumbnails?.has(pageId) || false;
+        };
+
+        // 🚫 FUNCIÓN PARA BLOQUEAR REGENERACIONES AUTOMÁTICAS
+        window.blockAutomaticRegeneration = () => {
+            window._blockAutoRegeneration = true;
+            logVPS('🚫 [BLOCK AUTO] Regeneraciones automáticas BLOQUEADAS');
+        };
+
+        window.unblockAutomaticRegeneration = () => {
+            window._blockAutoRegeneration = false;
+            logVPS('✅ [UNBLOCK AUTO] Regeneraciones automáticas DESBLOQUEADAS');
+        };
+
+        window.isAutoRegenerationBlocked = () => {
+            return window._blockAutoRegeneration || false;
+        };
+
+        // 🚨 VIGILANTE PERMANENTE: Detecta y previene sobrescrituras
+        if (!window._thumbnailWatchdog) {
+            window._thumbnailWatchdog = setInterval(() => {
+                if (window._protectedThumbnailData && window._protectedThumbnails) {
+                    const protectedIds = Array.from(window._protectedThumbnails);
+                    protectedIds.forEach(pageId => {
+                        const savedThumbnail = window._protectedThumbnailData[pageId];
+                        if (savedThumbnail) {
+                            // Verificar si el thumbnail actual es diferente al protegido
+                            setPageThumbnails(prev => {
+                                if (prev[pageId] && prev[pageId] !== savedThumbnail) {
+                                    console.error(`🚨 [WATCHDOG] ¡SOBRESCRITURA DETECTADA! Restaurando ${pageId}`);
+                                    return {
+                                        ...prev,
+                                        [pageId]: savedThumbnail
+                                    };
+                                }
+                                return prev;
+                            });
+                        }
+                    });
+                }
+            }, 100); // Verificar cada 100ms
+
+        }
+
+        // 🔒 BLOQUEO TOTAL: Interceptar setPageThumbnails globalmente
+        const originalSetPageThumbnails = setPageThumbnails;
+        const interceptedSetPageThumbnails = (updater) => {
+            if (typeof updater === 'function') {
+                return originalSetPageThumbnails(prev => {
+                    const newState = updater(prev);
+
+                    // Verificar si algún thumbnail protegido está siendo modificado
+                    if (window._protectedThumbnails && window._protectedThumbnailData) {
+                        const protectedIds = Array.from(window._protectedThumbnails);
+                        const restoredState = { ...newState };
+                        let wasRestored = false;
+
+                        protectedIds.forEach(pageId => {
+                            const currentThumbnail = newState[pageId];
+                            const protectedThumbnail = window._protectedThumbnailData[pageId];
+
+                            if (protectedThumbnail && currentThumbnail !== protectedThumbnail) {
+                                console.error(`🚨 [GLOBAL INTERCEPT] Sobrescritura bloqueada para ${pageId}`);
+                                restoredState[pageId] = protectedThumbnail;
+                                wasRestored = true;
+                            }
+                        });
+
+                        if (wasRestored) {
+                            console.error(`🔒 [GLOBAL RESTORE] Thumbnails protegidos restaurados`);
+                        }
+
+                        return restoredState;
+                    }
+
+                    return newState;
+                });
+            } else {
+                return originalSetPageThumbnails(updater);
+            }
+        };
+
+        // Reemplazar la función globalmente
+        if (!window._interceptorInstalled) {
+            window._interceptorInstalled = true;
+        }
+    }, []);
 
     // �🚀 Estado para control de inicialización de progreso
     const [hasInitializedProgress, setHasInitializedProgress] = useState(false);
@@ -896,6 +1178,465 @@ export default function EditorLibro() {
         };
     }, []);
 
+    // ⚡ OPTIMIZACIÓN: Memoizar cache key para evitar recálculos
+    const workspaceCacheKey = useMemo(() =>
+        JSON.stringify(workspaceDimensions), [workspaceDimensions]
+    );
+
+    // ⚡ FUNCIÓN OPTIMIZADA: Generar thumbnail con debounce mejorado
+    const generateCurrentPageThumbnail = useCallback(async (forceRegenerate = false) => {
+        // Solo bloquear si hay regeneración temporal en curso
+        if (window.BLOCK_AUTO_REGENERATION && !forceRegenerate) {
+            return;
+        }
+
+        // Verificar la página actual
+        const currentPageData = pages[currentPage];
+        if (!currentPageData || !workspaceDimensions) return;
+
+
+        console.log("pagina current actual", currentPageData);
+        const pageId = currentPageData.id;
+
+        // ⚡ OPTIMIZACIÓN: Debounce para evitar regeneraciones múltiples
+        if (!forceRegenerate) {
+            if (thumbnailDebounceTimers.current.has(pageId)) {
+                clearTimeout(thumbnailDebounceTimers.current.get(pageId));
+            }
+
+            const timer = setTimeout(() => {
+                thumbnailDebounceTimers.current.delete(pageId);
+                generateCurrentPageThumbnail(true); // Llamada real después del debounce
+            }, 300); // 300ms de debounce
+
+            thumbnailDebounceTimers.current.set(pageId, timer);
+            return;
+        }
+
+        // ⚡ OPTIMIZACIÓN: Cache rápido de thumbnails
+        const cacheKey = `${pageId}-${workspaceCacheKey}`;
+        if (!forceRegenerate && thumbnailCache.current.has(cacheKey)) {
+            const cachedThumbnail = thumbnailCache.current.get(cacheKey);
+            if (cachedThumbnail && Date.now() - cachedThumbnail.timestamp < 60000) { // Cache por 1 minuto
+                //setPageThumbnails(prev => ({ ...prev, [pageId]: cachedThumbnail.data }));
+                return;
+            }
+        }
+
+        // ANÁLISIS OPTIMIZADO DE FILTROS (reducir logging)
+        let pageHasFilters = false;
+        let elementsWithFilters = [];
+
+        if (currentPageData.cells) {
+            currentPageData.cells.forEach(cell => {
+                if (cell.elements) {
+                    cell.elements.forEach(element => {
+                        if (element.filters) {
+                            // ⚡ OPTIMIZACIÓN: Detección rápida de filtros sin logging excesivo
+                            const hasRealFilters =
+                                (element.filters.brightness !== undefined &&
+                                    element.filters.brightness !== 100 && element.filters.brightness !== 1) ||
+                                (element.filters.contrast !== undefined &&
+                                    element.filters.contrast !== 100 && element.filters.contrast !== 1) ||
+                                (element.filters.saturation !== undefined &&
+                                    element.filters.saturation !== 100 && element.filters.saturation !== 1) ||
+                                (element.filters.tint !== undefined && element.filters.tint !== 0) ||
+                                (element.filters.hue !== undefined && element.filters.hue !== 0) ||
+                                (element.filters.blur !== undefined && element.filters.blur > 0) ||
+                                (element.filters.opacity !== undefined &&
+                                    element.filters.opacity !== 100 && element.filters.opacity !== 1) ||
+                                (element.filters.scale !== undefined && element.filters.scale !== 1) ||
+                                (element.filters.rotate !== undefined && element.filters.rotate !== 0) ||
+                                element.filters.flipHorizontal ||
+                                element.filters.flipVertical;
+
+                            if (hasRealFilters) {
+                                pageHasFilters = true;
+                                elementsWithFilters.push(element);
+                                element._hasRealFilters = true;
+                                // ⚡ OPTIMIZACIÓN: Solo log esencial para filtros
+                                if (process.env.NODE_ENV === 'development') {
+                                    //    console.log(`🎨 [FILTRO] Elemento ${element.id}:`, element.filters);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // ⚡ OPTIMIZACIÓN: Logging reducido
+        if (process.env.NODE_ENV === 'development') {
+            // console.log(`🎯 [ANÁLISIS] Página ${pageId}: ${elementsWithFilters.length} elementos con filtros detectados`);
+        }
+
+        // Solo evitar regeneración si no hay filtros y no se fuerza
+        if (!forceRegenerate && !pageHasFilters && pageThumbnails[pageId]) {
+            const lastGenTime = window._thumbnailGenTimes?.[pageId] || 0;
+            const now = Date.now();
+            if (now - lastGenTime < 300000) { // 5 minutos
+                return;
+            }
+        }
+
+        if (thumbnailGenerating.current) {
+            //  console.log('⏳ Ya se está generando un thumbnail...');
+            return;
+        }
+
+        thumbnailGenerating.current = true;
+
+        try {
+            //  console.log(`🚀 [RADICAL GENERATOR] Generando thumbnail para página: ${pageId} (filtros: ${pageHasFilters})`);
+
+            // Exponer datos globalmente para el renderizador radical
+            window._currentPageData = currentPageData;
+            window._workspaceDimensions = workspaceDimensions;
+            window._updateThumbnailInUI = (id, thumbnail) => {
+                // 🛡️ PROTECCIÓN: Verificar si el thumbnail está protegido
+                if (window.isThumbnailProtected?.(id)) {
+                    console.error(`🚨 [UPDATE BLOCKED] ¡BLOQUEADO! Intento de actualizar thumbnail protegido ${id} via _updateThumbnailInUI`);
+                    console.error(`🚨 [UPDATE BLOCKED] Stack trace:`, new Error().stack);
+                    return; // No actualizar si está protegido
+                }
+
+                setPageThumbnails(prev => {
+                    //  console.log(`🔄 [UPDATE UI] Actualizando thumbnail ${id} via _updateThumbnailInUI`);
+                    return {
+                        ...prev,
+                        [id]: thumbnail
+                    };
+                });
+            };
+
+            // Registrar tiempo de generación
+            if (!window._thumbnailGenTimes) window._thumbnailGenTimes = {};
+            window._thumbnailGenTimes[pageId] = Date.now();
+
+            let thumbnail = null;
+
+            // 🔧 NUEVO: Obtener el layout actual para determinar el método de generación
+            const currentLayout = layouts.find(l => l.id === currentPageData.layout) || layouts[0];
+            const isComplexLayout = currentLayout.cellStyles && Object.values(currentLayout.cellStyles).some(style =>
+                style.includes('col-span-') || style.includes('row-span-')
+            );
+
+            // 🔧 PRIORIDAD 1: Layouts complejos (magazine-asymmetric, etc.)
+            if (isComplexLayout) {
+                console.log('🏗️ [LAYOUT COMPLEJO] Usando generador especializado para layout:', currentLayout.id);
+                try {
+                    // thumbnail = await generateThumbnailForComplexLayout(currentPageData, workspaceDimensions, currentLayout);
+                    console.log('✅ [LAYOUT COMPLEJO] Thumbnail generado exitosamente');
+                } catch (error) {
+                    console.error('❌ [LAYOUT COMPLEJO] Error, usando fallback:', error);
+                    // Fallback al método con filtros garantizados
+                    thumbnail = await generateThumbnailWithGuaranteedFilters(currentPageData, workspaceDimensions);
+                }
+            }
+            // 🔧 PRIORIDAD 2: Páginas con filtros
+            else if (pageHasFilters || forceRegenerate) {
+                // console.log('🔥 [MÉTODO RADICAL] Usando sistema de filtros garantizados');
+
+                try {
+                    thumbnail = await generateThumbnailWithGuaranteedFilters(currentPageData, workspaceDimensions);
+                    //   console.log('✅ [MÉTODO RADICAL] Thumbnail generado con filtros garantizados');
+                } catch (error) {
+                    console.error('❌ [MÉTODO RADICAL] Error, usando fallback:', error);
+                    // Fallback al método normal
+                    thumbnail = await generateSingleThumbnail({
+                        page: currentPageData,
+                        workspaceDimensions,
+                        preserveFilters: true
+                    });
+                }
+            }
+            // 🔧 PRIORIDAD 3: Páginas simples sin filtros
+            else {
+                // Para páginas sin filtros, usar el método normal
+                //   console.log('📸 [MÉTODO NORMAL] Generando thumbnail sin filtros especiales');
+                thumbnail = await generateSingleThumbnail({
+                    page: currentPageData,
+                    workspaceDimensions,
+                    preserveFilters: false
+                });
+            }
+
+            if (thumbnail) {
+
+                // �🛡️ PROTEGER THUMBNAIL SI TIENE FILTROS ANTES DE ESTABLECERLO (solo en local)
+                if (pageHasFilters) {
+                    window.protectThumbnail?.(pageId);
+                    window.blockAutomaticRegeneration?.(); // 🚫 BLOQUEAR REGENERACIONES AUTOMÁTICAS
+                    // console.log(`🛡️ [FILTER PROTECTION] Thumbnail ${pageId} protegido porque tiene filtros aplicados`);
+                    // console.log(`🚫 [AUTO BLOCK] Regeneraciones automáticas BLOQUEADAS para preservar filtros`);
+
+                    // Establecer con máxima prioridad y marcar como protegido
+                    setPageThumbnails(prev => {
+                        // console.log(`🔥 [FORCE SET] Estableciendo thumbnail con filtros para ${pageId} (PROTEGIDO)`);
+                        return {
+                            ...prev,
+                            [pageId]: thumbnail
+                        };
+                    });
+
+                    // Programar verificación para asegurar que no se sobrescriba
+                    setTimeout(() => {
+                        setPageThumbnails(prev => {
+                            if (prev[pageId] !== thumbnail) {
+                                warn(`🚨 [PROTECTION RESTORE] Restaurando thumbnail protegido para ${pageId}`);
+                                return {
+                                    ...prev,
+                                    [pageId]: thumbnail
+                                };
+                            }
+                            return prev;
+                        });
+                    }, 100);
+
+                    // 🚨 SISTEMA DE EMERGENCIA: Solo en desarrollo
+                    const emergencyRestore = () => {
+                        setPageThumbnails(prev => {
+                            if (prev[pageId] !== thumbnail) {
+                                error(`🚨 [EMERGENCY RESTORE] ¡PARPADEO DETECTADO! Restaurando thumbnail para ${pageId}`);
+                                return {
+                                    ...prev,
+                                    [pageId]: thumbnail
+                                };
+                            }
+                            return prev;
+                        });
+                    };
+
+                    // Verificaciones múltiples en diferentes intervalos
+                    setTimeout(emergencyRestore, 200);
+                    setTimeout(emergencyRestore, 500);
+                    setTimeout(emergencyRestore, 1000);
+                    setTimeout(emergencyRestore, 2000);
+
+                    // 🔒 BLOQUEO PERMANENTE: Guardar referencia para restauraciones futuras
+                    if (!window._protectedThumbnailData) window._protectedThumbnailData = {};
+                    window._protectedThumbnailData[pageId] = thumbnail;
+
+                } else {
+                    // Thumbnail sin filtros, usar método normal
+                    setPageThumbnailsSafely(pageId, thumbnail, 'generateCurrentPageThumbnail');
+                }
+
+
+                //  console.log(`✅ [SUCCESS] Thumbnail generado exitosamente para página: ${pageId}`);
+
+                // 🔍 VERIFICACIÓN POST-GENERACIÓN: Confirmar que los filtros se aplicaron
+                if (pageHasFilters && !forceRegenerate) {
+
+                    // Marcar que esta verificación ya se hizo para evitar bucles
+                    if (!window._filterVerificationDone) window._filterVerificationDone = new Set();
+
+                    if (!window._filterVerificationDone.has(pageId)) {
+                        window._filterVerificationDone.add(pageId);
+
+                        // Verificar en el próximo tick si el thumbnail parece tener filtros aplicados
+                        setTimeout(async () => {
+                            try {
+                                // Si llegamos aquí y no se ven los filtros, usar método radical como último recurso
+
+                                // 🎯 VERIFICAR DATOS ANTES DE ENVIAR (ÚLTIMO RECURSO)
+
+
+                                const radicalThumbnail = await generateThumbnailWithGuaranteedFilters(currentPageData, workspaceDimensions);
+
+                                if (radicalThumbnail) {
+                                    // 🛡️ PROTEGER EL THUMBNAIL RADICAL
+                                    window.protectThumbnail?.(pageId);
+
+                                    setPageThumbnails(prev => {
+                                        return {
+                                            ...prev,
+                                            [pageId]: radicalThumbnail
+                                        };
+                                    });
+                                }
+                            } catch (error) {
+                                console.warn('⚠️ [RADICAL FALLBACK] Error en método radical:', error);
+                            }
+                        }, 1000); // Solo una vez, después de 1 segundo
+                    }
+                }
+
+                // Marcar como protegido si tiene filtros
+                if (pageHasFilters) {
+                    if (!window._protectedThumbnailIds) window._protectedThumbnailIds = [];
+                    if (!window._protectedThumbnailIds.includes(pageId)) {
+                        window._protectedThumbnailIds.push(pageId);
+                    }
+                    if (process.env.NODE_ENV === 'development') {
+                        //   console.log(`🔒 [PROTECCIÓN] Thumbnail con filtros protegido: ${pageId}`);
+                    }
+                }
+
+                // ⚡ OPTIMIZACIÓN: Guardar en cache todos los thumbnails exitosos
+                const cacheKey = `${pageId}-${workspaceCacheKey}`;
+                thumbnailCache.current.set(cacheKey, {
+                    data: thumbnail,
+                    timestamp: Date.now(),
+                    hasFilters: pageHasFilters
+                });
+
+                // ⚡ OPTIMIZACIÓN: Limpiar cache viejo (máximo 50 entradas)
+                if (thumbnailCache.current.size > 50) {
+                    const oldestKey = thumbnailCache.current.keys().next().value;
+                    thumbnailCache.current.delete(oldestKey);
+                }
+
+            } else {
+                console.error(`❌ [ERROR] No se pudo generar thumbnail para página: ${pageId}`);
+            }
+
+        } catch (error) {
+            console.error(`❌ [CRITICAL ERROR] Error generando thumbnail para página ${pageId}:`, error);
+        } finally {
+            thumbnailGenerating.current = false;
+        }
+    }, [pages, currentPage, workspaceDimensions, pageThumbnails]);
+
+    // ️ Función para generar thumbnails locales usando la función importada (OPTIMIZADA)
+    const generateLocalThumbnails = useCallback(
+        debounce(async () => {
+            // 🚨 PROTECCIÓN ANTI-RESET: Bloquear regeneraciones automáticas que puedan sobrescribir thumbnails con filtros
+            if (window.BLOCK_AUTO_REGENERATION) {
+                //  console.log('🛡️ [PROTECCIÓN-GLOBAL] Bloqueando generación masiva mientras los filtros están protegidos');
+                return;
+            }
+
+            // 🚨 PROTECCIÓN SECUNDARIA: No regenerar si tenemos thumbnails protegidos
+            if (window.THUMBNAIL_PROTECTED) {
+                return;
+            }
+
+            if (!pages?.length || !workspaceDimensions) return;
+
+            // 🚀 OPTIMIZACIÓN: Evitar regeneración si ya están generando
+            if (thumbnailGenerating.current) {
+                return;
+            }
+
+            thumbnailGenerating.current = true;
+
+            try {
+                // 🚀 OPTIMIZACIÓN: Generar solo thumbnails que no existen
+                const missingThumbnails = pages.filter(page => !pageThumbnails[page.id]);
+
+                if (missingThumbnails.length === 0) {
+                    return;
+                }
+
+
+                // ⚡ NUEVA OPTIMIZACIÓN: Usar generador rápido con progreso
+                // 🚫 VERIFICAR SI ESTÁ BLOQUEADO
+                if (window.isAutoRegenerationBlocked?.()) {
+                    console.warn(`🚫 [BLOCKED] Regeneración automática bloqueada, saltando generateFastThumbnails`);
+                    return; // Salir sin generar
+                }
+
+                const thumbnailsObject = await generateFastThumbnails({
+                    pages: missingThumbnails,
+                    workspaceDimensions,
+                    onProgress: (progress) => {
+                        setThumbnailProgress(progress);
+                    }
+                });
+
+                if (thumbnailsObject && Object.keys(thumbnailsObject).length > 0) {
+                    setPageThumbnails(prev => {
+                        console.warn(`🚨 [FAST THUMBNAILS] ¡ALERTA! generateFastThumbnails sobrescribiendo thumbnails - POSIBLE CULPABLE`);
+                        console.warn(`🚨 [FAST THUMBNAILS] Stack trace:`, new Error().stack);
+
+                        // Filtrar thumbnails protegidos
+                        const filteredThumbnails = {};
+                        for (const [pageId, thumbnail] of Object.entries(thumbnailsObject)) {
+                            if (window.isThumbnailProtected?.(pageId)) {
+                                console.warn(`🛡️ [FAST PROTECTION] NO sobrescribiendo thumbnail protegido: ${pageId}`);
+                            } else {
+                                filteredThumbnails[pageId] = thumbnail;
+                            }
+                        }
+
+                        return {
+                            ...prev,
+                            ...filteredThumbnails // Solo añadir los no protegidos
+                        };
+                    });
+                }
+            } catch (error) {
+                console.warn('⚠️ Error generando thumbnails rápidos:', error);
+            } finally {
+                thumbnailGenerating.current = false;
+                setThumbnailProgress(null);
+            }
+        }, 300), // Reducido el debounce para mayor responsividad
+        [pages, workspaceDimensions, pageThumbnails]
+    );
+
+    // 🚀 OPTIMIZACIÓN: Ref para controlar generación de thumbnails
+    const thumbnailGenerating = useRef(false);
+
+    // ⚡ NUEVA FUNCIÓN: Generar thumbnails con prioridades
+    const generatePriorityThumbnails = useCallback(async (priorityPageIds = []) => {
+        if (thumbnailGenerating.current) return;
+
+        try {
+            thumbnailGenerating.current = true;
+
+            // Si hay páginas específicas con prioridad, generarlas primero
+            if (priorityPageIds.length > 0) {
+                const priorityPages = pages.filter(p => priorityPageIds.includes(p.id));
+                if (priorityPages.length > 0) {
+
+                    // 🚫 VERIFICAR SI ESTÁ BLOQUEADO
+                    if (window.isAutoRegenerationBlocked?.()) {
+                        console.warn(`🚫 [BLOCKED] Regeneración de prioridad bloqueada, saltando generateFastThumbnails`);
+                    } else {
+                        const priorityThumbnails = await generateFastThumbnails({
+                            pages: priorityPages,
+                            workspaceDimensions
+                        });
+
+                        if (priorityThumbnails && Object.keys(priorityThumbnails).length > 0) {
+                            setPageThumbnails(prev => {
+                                console.warn(`🚨 [PRIORITY THUMBNAILS] ¡ALERTA! generateFastThumbnails de prioridad sobrescribiendo - POSIBLE CULPABLE`);
+                                console.warn(`🚨 [PRIORITY THUMBNAILS] Stack trace:`, new Error().stack);
+
+                                // Filtrar thumbnails protegidos
+                                const filteredThumbnails = {};
+                                for (const [pageId, thumbnail] of Object.entries(priorityThumbnails)) {
+                                    if (window.isThumbnailProtected?.(pageId)) {
+                                        console.warn(`🛡️ [PRIORITY PROTECTION] NO sobrescribiendo thumbnail protegido: ${pageId}`);
+                                    } else {
+                                        filteredThumbnails[pageId] = thumbnail;
+                                    }
+                                }
+
+                                return {
+                                    ...prev,
+                                    ...filteredThumbnails // Solo añadir los no protegidos
+                                };
+                            });
+                        }
+                    } // 🚫 Cerrar el else del bloque de verificación de bloqueo automático
+                }
+            }
+
+            // Luego generar el resto de forma silenciosa
+            // DESHABILITADO: Solo generar por página individual
+            // setTimeout(() => {
+            //     generateLocalThumbnails();
+            // }, 100);
+
+        } catch (error) {
+            console.warn('⚠️ Error en generación prioritaria:', error);
+        } finally {
+            thumbnailGenerating.current = false;
+        }
+    }, [pages, workspaceDimensions, generateLocalThumbnails]);
 
     // 🚀 OPTIMIZACIÓN: Pre-cache de imágenes en background
     const preloadImageCache = useCallback((imageUrl) => {
@@ -981,6 +1722,235 @@ export default function EditorLibro() {
             clearThumbnailCaches();
         };
     }, []);
+
+    // 🖼️ Función para cargar thumbnails con nueva estructura después de generarlos
+    const loadThumbnailsWithNewStructure = useCallback(async () => {
+        if (!projectData?.id || !pages?.length) return;
+
+        // 🛡️ Evitar llamadas múltiples simultáneas
+        if (isLoadingThumbnails) {
+            return;
+        }
+
+        try {
+            setIsLoadingThumbnails(true);
+
+            // 🔄 NUEVA ESTRUCTURA: Cargar thumbnails existentes desde archivos
+            const response = await fetch(`/api/thumbnails/${projectData.id}/existing`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                credentials: 'include',
+                body: JSON.stringify({ pages })
+            });
+
+            if (response.ok) {
+                const existingThumbnails = await response.json();
+
+                if (existingThumbnails && Object.keys(existingThumbnails).length > 0) {
+                    setPageThumbnails(prev => ({
+                        ...prev,
+                        ...existingThumbnails
+                    }));
+                } else {
+                    // Solo generar thumbnail de la página actual
+                    setTimeout(() => generateCurrentPageThumbnail(), 200);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Error cargando thumbnails existentes:', error);
+            // Fallback: generar thumbnail solo de la página actual
+            setTimeout(() => generateCurrentPageThumbnail(), 200);
+        } finally {
+            setIsLoadingThumbnails(false);
+        }
+    }, [projectData?.id, pages, generateCurrentPageThumbnail, isLoadingThumbnails]);
+
+    // 🖼️ Función para generar y guardar thumbnails en la base de datos
+    const generateAndSavePageThumbnails = useCallback(async () => {
+        if (!projectData?.id || !pages?.length) return;
+
+        try {
+            // Solo generar thumbnail para la página actual
+            const currentPageData = pages[currentPage];
+            if (!currentPageData) return;
+
+            const response = await fetch(`/api/thumbnails/${projectData.id}/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                },
+                body: JSON.stringify({
+                    pages: [currentPageData], // Solo la página actual
+                    width: workspaceDimensions.width,
+                    height: workspaceDimensions.height,
+                    quality: 95,
+                    scale: 4,
+                    dpi: 300
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.thumbnails) {
+                    // Actualizar thumbnails locales
+                    const thumbnailsObject = {};
+                    data.thumbnails.forEach(thumbnail => {
+                        if (thumbnail.page_id && thumbnail.thumbnail_url) {
+                            thumbnailsObject[thumbnail.page_id] = thumbnail.thumbnail_url;
+                        }
+                    });
+
+                    setPageThumbnails(prev => ({
+                        ...prev,
+                        ...thumbnailsObject
+                    }));
+
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Error generando thumbnail:', error);
+        }
+    }, [projectData?.id, pages, currentPage, workspaceDimensions]);
+
+    // Función para generar thumbnails de TODAS las páginas (solo para guardado final)
+    const generateAllPageThumbnails = useCallback(async () => {
+        if (!projectData?.id || !pages?.length) return;
+
+        try {
+            const response = await fetch(`/api/thumbnails/${projectData.id}/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                },
+                body: JSON.stringify({
+                    pages: pages, // Todas las páginas
+                    width: workspaceDimensions.width,
+                    height: workspaceDimensions.height,
+                    quality: 95,
+                    scale: 4,
+                    dpi: 300
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.thumbnails) {
+                    // Actualizar thumbnails locales
+                    const thumbnailsObject = {};
+                    data.thumbnails.forEach(thumbnail => {
+                        if (thumbnail.page_id && thumbnail.thumbnail_url) {
+                            thumbnailsObject[thumbnail.page_id] = thumbnail.thumbnail_url;
+                        }
+                    });
+
+                    setPageThumbnails(prev => ({
+                        ...prev,
+                        ...thumbnailsObject
+                    }));
+
+                    //console.log('✅ Todos los thumbnails generados y guardados en storage:', data.thumbnails.length);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Error generando todos los thumbnails:', error);
+        }
+    }, [projectData?.id, pages, workspaceDimensions]);
+
+    // 🚀 NUEVA FUNCIÓN: Cargar thumbnails PDF existentes para el modal (sin generar nuevos)
+    const loadExistingPDFThumbnails = useCallback(async (onProgress = null) => {
+        if (!projectData?.id || !pages?.length) return {};
+
+        try {
+
+            // Crear objeto con las URLs de los thumbnails PDF que deberían existir
+            const pdfThumbnails = {};
+            const verifiedThumbnails = {};
+            let loadedCount = 0;
+
+            // Función para verificar si existe un thumbnail
+            const verifyThumbnailExists = async (url, pageId) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        verifiedThumbnails[pageId] = url;
+                        loadedCount++;
+                        onProgress?.(loadedCount, pages.length);
+                        resolve(true);
+                    };
+                    img.onerror = () => {
+                        console.warn(`⚠️ [ALBUM-MODAL] Thumbnail no encontrado: ${url}`);
+                        loadedCount++;
+                        onProgress?.(loadedCount, pages.length);
+                        resolve(false);
+                    };
+                    img.src = url;
+                });
+            };
+
+            // Crear todas las promesas de verificación
+            const verificationPromises = pages.map(async (page, index) => {
+                // 🔧 FIX DEFINITIVO: Mapear correctamente según configuración y presencia de páginas
+                let realPageNumber;
+
+                // ✅ VALIDACIÓN DE SEGURIDAD: Verificar que itemData existe
+                const hasCoverEnabled = itemData && (itemData.has_cover_image === true || itemData.has_cover_image === 1);
+                const hasBackCoverEnabled = itemData && (itemData.has_back_cover_image === true || itemData.has_back_cover_image === 1);
+                const hasCover = hasCoverEnabled && pages.some(p => p.type === 'cover');
+                const hasBackCover = hasBackCoverEnabled && pages.some(p => p.type === 'final');
+
+                if (page.type === 'cover') {
+                    // Portada siempre es página 0 cuando está habilitada
+                    realPageNumber = 0;
+                } else if (page.type === 'content') {
+                    // 🎯 SOLUCIÓN DEFINITIVA: Content pages siempre empiezan desde 1 cuando no hay cover
+                    if (hasCover) {
+                        // Si hay portada: portada=0, content empezará desde 1
+                        const contentPages = pages.filter(p => p.type === 'content');
+                        const contentIndex = contentPages.findIndex(p => p.id === page.id);
+                        realPageNumber = contentIndex + 1; // +1 porque portada ocupa el 0
+                    } else {
+                        // Si NO hay portada: content empieza desde 1 directamente (NO desde 0)
+                        const contentPages = pages.filter(p => p.type === 'content');
+                        const contentIndex = contentPages.findIndex(p => p.id === page.id);
+                        realPageNumber = contentIndex + 1; // +1 para empezar desde 1, no desde 0
+                    }
+                } else if (page.type === 'final') {
+                    // Contraportada: obtener el número siguiente al último content
+                    const contentPages = pages.filter(p => p.type === 'content');
+                    const lastContentNumber = hasCover ? contentPages.length : contentPages.length;
+                    realPageNumber = lastContentNumber + (hasCover ? 1 : 1); // Siempre siguiente al último content
+                } else {
+                    // Fallback al índice actual
+                    realPageNumber = index;
+                }
+
+                const pdfUrl = `/storage/images/thumbnails/${projectData.id}/page-${realPageNumber}-pdf.webp`;
+                const pageId = page.id || `page-${index}`;
+                pdfThumbnails[pageId] = pdfUrl;
+
+
+
+                return verifyThumbnailExists(pdfUrl, pageId);
+            });
+
+            // Ejecutar todas las verificaciones en paralelo
+            await Promise.all(verificationPromises);
+
+
+            // Retornar todos los URLs (existentes y faltantes) para que el modal maneje los placeholders
+            return pdfThumbnails;
+
+        } catch (error) {
+            console.warn('⚠️ [ALBUM-MODAL] Error cargando thumbnails PDF:', error);
+            return {};
+        }
+    }, [projectData?.id, pages, itemData]);
 
 
     // Actualizar estados del editor cuando se cargan los datos del proyecto
@@ -1275,29 +2245,32 @@ export default function EditorLibro() {
     };
 
     // Función para capturar el workspace actual con alta calidad y sin bordes
-    const captureCurrentWorkspace = useCallback(async (pageIndex, options = { type: 'thumbnail' }) => {
+    const captureCurrentWorkspace = useCallback(async (options = { type: 'thumbnail' }) => {
+        // 🚀 CRÍTICO VPS: No ejecutar en entorno servidor para evitar consumo masivo
+        if (isServer) {
+            error('🚫 [VPS-PROTECTION] captureCurrentWorkspace bloqueado en servidor');
+            return null;
+        }
 
-        if (!pages[pageIndex]) return null;
+        if (!pages[currentPage]) return null;
 
         try {
             // CORRECCIÓN THUMBNAIL: Buscar específicamente el elemento de la página que tiene las dimensiones correctas de la BD
-            let workspaceElement = document.querySelector(`#page-${pages[pageIndex].id}`);
+            let workspaceElement = document.querySelector(`#page-${pages[currentPage].id}`);
 
             if (!workspaceElement) {
                 console.warn('❌ THUMBNAIL: No se encontró el elemento de página específico');
                 return null;
             }
 
-
-
             // Debug adicional para la página actual
-            const currentPageData = pages[pageIndex];
+            const currentPageData = pages[currentPage];
 
             // 🔧 DETECTAR MODO LAYOUT: Verificar si estamos en modo layout con celdas
             const hasLayoutCells = currentPageData?.cells && currentPageData.cells.length > 0;
             const isLayoutMode = hasLayoutCells && workspaceElement.classList.contains('grid');
 
-            logVPS(`🔧 [CAPTURE-MODE] Página ${pageIndex}: ${isLayoutMode ? 'LAYOUT' : 'LIBRE'}, Celdas: ${currentPageData?.cells?.length || 0}`);
+            logVPS(`🔧 [CAPTURE-MODE] Página ${currentPage}: ${isLayoutMode ? 'LAYOUT' : 'LIBRE'}, Celdas: ${currentPageData?.cells?.length || 0}`);
 
             // 🛠️ LAYOUT MODE: Esperar renderizado del grid antes de capturar (OPTIMIZADO)
             if (isLayoutMode) {
@@ -1315,7 +2288,6 @@ export default function EditorLibro() {
                         const cells = workspaceElement.querySelectorAll('[data-cell-id]');
 
                         if (!isProduction) {
-
                             // Solo mostrar logs detallados en desarrollo
                             if (cells.length <= 4) { // Limitar logs para layouts complejos
                                 cells.forEach((cell, idx) => {
@@ -1336,8 +2308,8 @@ export default function EditorLibro() {
             const isProduction = process.env.NODE_ENV === 'production' || window.location.hostname !== 'localhost';
             const scaleFactor = isPDF ?
                 4 : // 4x para PDF 4000px alta calidad consistente
-                4; // 4x para ULTRA ALTA calidad (4000x3200px) tanto en producción como local
-            const quality = 1.0; // Calidad máxima sin compresión
+                1; // 1x para thumbnails de baja resolución (300x210px)
+            const quality = isPDF ? 1.0 : 0.8; // Calidad máxima para PDF, reducida para thumbnails
 
             // Obtener dimensiones apropiadas según el tipo
             const dimensions = isPDF ? getFullWorkspaceDimensions() : workspaceDimensions;
@@ -1459,7 +2431,7 @@ export default function EditorLibro() {
 
                     // CORRECCIÓN THUMBNAIL: Configurar específicamente el elemento de página clonado
                     try {
-                        const clonedPageElement = clonedDoc.querySelector(`#page-${pages[pageIndex].id}`);
+                        const clonedPageElement = clonedDoc.querySelector(`#page-${pages[currentPage].id}`);
 
 
                         if (clonedPageElement) {
@@ -1632,6 +2604,7 @@ export default function EditorLibro() {
 
                                             // 🚀 Convertir a máxima calidad 4K
                                             const croppedDataUrl = tempCanvas.toDataURL('image/png', 1.0);
+                                            console.log('th [2786]:', croppedDataUrl)
 
                                             // Aplicar la imagen pre-procesada
                                             img.src = croppedDataUrl;
@@ -1707,7 +2680,7 @@ export default function EditorLibro() {
                         const style = clonedDoc.createElement('style');
                         style.textContent = `
                             /* CORRECCIÓN THUMBNAIL: Estructura del elemento de página */
-                            #page-${pages[pageIndex].id} {
+                            #page-${pages[currentPage].id} {
                                 width: ${dimensions.width}px !important;
                                 height: ${dimensions.height}px !important;
                                 position: relative !important;
@@ -1755,7 +2728,7 @@ export default function EditorLibro() {
                             }
                             
                             /* Backgrounds de página */
-                            #page-${pages[pageIndex].id} {
+                            #page-${pages[currentPage].id} {
                                 background-size: cover !important;
                                 background-position: center !important;
                                 background-repeat: no-repeat !important;
@@ -1860,24 +2833,68 @@ export default function EditorLibro() {
                     throw new Error('Canvas del elemento de página tiene dimensiones inválidas');
                 }
 
-                // Get canvas preset dimensions
-                const { height, width, dpi } = projectData.canvas_preset;
-                const maxSizeMm = Math.max(height, width);
-                const maxSizePx = Math.round((maxSizeMm * dpi) / 25.4);
-
                 // Create temporary canvas for resizing
                 const tempCanvas = document.createElement('canvas');
-                const maxDimension = Math.max(canvas.width, canvas.height);
-                const scale = maxSizePx / maxDimension;
-                tempCanvas.width = Math.round(canvas.width * scale);
-                tempCanvas.height = Math.round(canvas.height * scale);
+                
+                if (isPDF) {
+                    // Get canvas preset dimensions for PDF
+                    const { height, width, dpi } = projectData.canvas_preset;
+                    const maxSizeMm = Math.max(height, width);
+                    const maxSizePx = Math.round((maxSizeMm * dpi) / 25.4);
+                    
+                    // Scale for PDF
+                    const maxDimension = Math.max(canvas.width, canvas.height);
+                    const scale = maxSizePx / maxDimension;
+                    tempCanvas.width = Math.round(canvas.width * scale);
+                    tempCanvas.height = Math.round(canvas.height * scale);
+                } else {
+                    // Thumbnail con tamaño fijo de 300x210px manteniendo proporción
+                    const aspectRatio = canvas.width / canvas.height;
+                    
+                    // Determinar dimensiones basadas en el aspect ratio
+                    let targetWidth = 300;
+                    let targetHeight = 210;
+                    
+                    // Ajustar dimensiones manteniendo aspect ratio
+                    if (aspectRatio > targetWidth / targetHeight) {
+                        // Imagen más ancha que alta
+                        tempCanvas.width = targetWidth;
+                        tempCanvas.height = Math.round(targetWidth / aspectRatio);
+                    } else {
+                        // Imagen más alta que ancha
+                        tempCanvas.height = targetHeight;
+                        tempCanvas.width = Math.round(targetHeight * aspectRatio);
+                    }
+                }
 
-                // Draw and resize image
+                // Draw and resize image with object-fit: cover simulation
                 const ctx = tempCanvas.getContext('2d');
-                ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+                
+                // Simular object-fit: cover
+                const sourceAspect = canvas.width / canvas.height;
+                const targetAspect = tempCanvas.width / tempCanvas.height;
+                
+                let sx = 0, sy = 0, sWidth = canvas.width, sHeight = canvas.height;
+                
+                if (sourceAspect > targetAspect) {
+                    // Imagen fuente más ancha - recortar los lados
+                    sWidth = Math.round(canvas.height * targetAspect);
+                    sx = Math.round((canvas.width - sWidth) / 2);
+                } else if (sourceAspect < targetAspect) {
+                    // Imagen fuente más alta - recortar arriba/abajo
+                    sHeight = Math.round(canvas.width / targetAspect);
+                    sy = Math.round((canvas.height - sHeight) / 2);
+                }
+                
+                ctx.drawImage(
+                    canvas,
+                    sx, sy, sWidth, sHeight,  // Source rectangle (crop)
+                    0, 0, tempCanvas.width, tempCanvas.height  // Destination rectangle
+                );
 
                 // Convert to dataURL with appropriate quality
-                dataUrl = tempCanvas.toDataURL('image/png', 1);
+                dataUrl = tempCanvas.toDataURL(isPDF ? 'image/png' : 'image/jpeg', quality);
+                console.log('th [3017]:', dataUrl)
 
                 if (!isProduction) {
                     //continue producction
@@ -1922,9 +2939,11 @@ export default function EditorLibro() {
             // Fallback: crear thumbnail con las dimensiones exactas del workspace de la BD
             try {
                 const canvas = document.createElement('canvas');
-                // Usar el scaleFactor ya definido arriba (4x para ambos casos)
-                canvas.width = dimensions.width * scaleFactor;
-                canvas.height = dimensions.height * scaleFactor;
+                // Usar dimensiones fijas para thumbnails
+                const targetWidth = 300;
+                const targetHeight = 210;
+                canvas.width = isPDF ? dimensions.width * scaleFactor : targetWidth;
+                canvas.height = isPDF ? dimensions.height * scaleFactor : targetHeight;
                 const ctx = canvas.getContext('2d');
 
                 // CORRECCIÓN THUMBNAIL: Aplicar background del elemento de página en fallback
@@ -1934,16 +2953,14 @@ export default function EditorLibro() {
 
                 // Texto indicativo
                 ctx.fillStyle = bgColor === '#ffffff' || bgColor.includes('white') ? '#374151' : '#666666';
-                ctx.font = `${14 * scaleFactor}px Arial`;
+                ctx.font = `${isPDF ? 14 * scaleFactor : 14}px Arial`;
                 ctx.textAlign = 'center';
-                ctx.fillText('Página ' + (pageIndex + 1), canvas.width / 2, canvas.height / 2);
-
-
+                ctx.fillText('Página ' + (currentPage + 1), canvas.width / 2, canvas.height / 2);
 
                 if (options.type === 'pdf') {
                     return canvas;
                 } else {
-                    const fallbackDataUrl = canvas.toDataURL('image/png', 1.0); // 🚀 Máxima calidad
+                    const fallbackDataUrl = canvas.toDataURL(isPDF ? 'image/png' : 'image/jpeg', isPDF ? 1.0 : 0.8);
                     return fallbackDataUrl;
                 }
             } catch (fallbackError) {
@@ -1952,6 +2969,290 @@ export default function EditorLibro() {
         }
     }, [currentPage, pages]);
 
+    // Generar miniatura para la página actual (optimizada)
+    const generateCurrentThumbnail = useCallback(async () => {
+        if (!pages[currentPage]) return;
+
+        const thumbnail = await captureCurrentWorkspace({ type: 'thumbnail' });
+        if (thumbnail) {
+            setPageThumbnails(prev => ({
+                ...prev,
+                [pages[currentPage].id]: thumbnail
+            }));
+        }
+    }, [captureCurrentWorkspace, currentPage, pages]);
+
+    // ⚡ Regeneración de thumbnail optimizada para cambios en página actual
+    const scheduleThumbnailGeneration = useCallback(() => {
+        clearTimeout(thumbnailTimeout.current);
+        thumbnailTimeout.current = setTimeout(() => {
+            // Regenerar thumbnail de la página actual cuando hay cambios
+            if (pages[currentPage]) {
+                // Limpiar thumbnail existente para forzar regeneración
+                setPageThumbnails(prev => {
+                    const updated = { ...prev };
+                    delete updated[pages[currentPage].id];
+                    return updated;
+                });
+
+                // Generar nuevo thumbnail después de un pequeño delay
+                setTimeout(() => {
+                    generateCurrentPageThumbnail();
+                }, 200);
+            }
+        }, 1000); // 1 segundo para evitar regeneración excesiva durante edición
+    }, [pages, currentPage, generateCurrentPageThumbnail]);
+
+    // ⚡ Función para regenerar thumbnail de página actual inmediatamente
+    const generateImmediateThumbnail = useCallback(() => {
+        if (pages[currentPage]) {
+            // Limpiar thumbnail existente para forzar regeneración
+            setPageThumbnails(prev => {
+                const updated = { ...prev };
+                delete updated[pages[currentPage].id];
+                return updated;
+            });
+
+            setTimeout(() => {
+                generateCurrentPageThumbnail();
+            }, 300);
+        }
+    }, [pages, currentPage, generateCurrentPageThumbnail]);
+
+    // Función para generar thumbnail de alta calidad para una página específica
+    const generateHighQualityThumbnail = useCallback(async (pageIndex = currentPage, size = { width: 800, height: 600 }) => {
+        if (!pages[pageIndex]) return null;
+
+        try {
+
+            // Cambiar temporalmente a la página requerida
+            const originalPage = currentPage;
+            if (pageIndex !== currentPage) {
+                setCurrentPage(pageIndex);
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            const workspaceElement = document.querySelector(`#page-${pages[pageIndex].id}`);
+            if (!workspaceElement) {
+                console.warn('Workspace element not found for page:', pages[pageIndex].id);
+                return null;
+            }
+
+            // Opciones para thumbnail de alta calidad
+            const options = {
+                scale: 4, // 🚀 4x para alta calidad eficiente
+                useCORS: true,
+                allowTaint: false,
+                backgroundColor: pages[pageIndex]?.backgroundColor || '#ffffff',
+                width: workspaceElement.offsetWidth,
+                height: workspaceElement.offsetHeight,
+                removeContainer: true,
+                logging: false,
+                onclone: (clonedDoc) => {
+                    // Limpiar elementos de UI
+                    const excludedSelectors = [
+                        '.toolbar', '.ui-element', '.floating',
+                        '.overlay', '.modal', '.popover',
+                        '.text-toolbar', '.element-selector',
+                        '.element-controls', '.resize-handle',
+                        '.resize-control-handle',
+                        '.resize-manipulation-indicator',
+                        '.sidebar', '.panel', '.btn', '.button',
+                        '.control', '.menu', '.dropdown',
+                        '.tooltip', '.pointer-events-none',
+                        '[data-exclude-thumbnail="true"]'
+                    ];
+
+                    excludedSelectors.forEach(selector => {
+                        const elements = clonedDoc.querySelectorAll(selector);
+                        elements.forEach(el => el.remove());
+                    });
+
+                    // CRÍTICO: Encontrar el elemento workspace en el clon y asegurar background correcto
+                    const clonedWorkspace = clonedDoc.querySelector(`#page-${pages[pageIndex].id}`);
+                    if (clonedWorkspace) {
+                        const pageData = pages[pageIndex];
+
+                        // Forzar background-image si existe
+                        if (pageData?.backgroundImage) {
+                            clonedWorkspace.style.backgroundImage = `url(${pageData.backgroundImage})`;
+                            clonedWorkspace.style.backgroundSize = 'cover';
+                            clonedWorkspace.style.backgroundPosition = 'center';
+                            clonedWorkspace.style.backgroundRepeat = 'no-repeat';
+                        }
+
+                        // Aplicar backgroundColor si existe
+                        if (pageData?.backgroundColor) {
+                            clonedWorkspace.style.backgroundColor = pageData.backgroundColor;
+                        }
+                    }
+
+                    // Mantener object-fit: cover para imágenes con preservación de estilos originales
+                    try {
+                        // CRÍTICO: Capturar y preservar los estilos de las imágenes del workspace original
+                        const originalImages = workspaceElement.querySelectorAll('img');
+                        const imageStyles = new Map();
+
+                        originalImages.forEach((img, index) => {
+                            const computedStyle = getComputedStyle(img);
+                            imageStyles.set(index, {
+                                objectFit: computedStyle.objectFit,
+                                objectPosition: computedStyle.objectPosition,
+                                width: computedStyle.width,
+                                height: computedStyle.height,
+                                borderRadius: computedStyle.borderRadius,
+                                transform: computedStyle.transform
+                            });
+                        });
+
+                        // Aplicar los estilos preservados a las imágenes clonadas
+                        const clonedImages = clonedDoc.querySelectorAll('img');
+                        clonedImages.forEach((img, index) => {
+                            const styles = imageStyles.get(index);
+                            if (styles) {
+                                img.style.objectFit = styles.objectFit || 'cover';
+                                img.style.objectPosition = styles.objectPosition || 'center';
+                                img.style.width = styles.width;
+                                img.style.height = styles.height;
+                                img.style.borderRadius = styles.borderRadius;
+                                img.style.transform = styles.transform;
+
+
+                            }
+                        });
+                    } catch (e) {
+                        console.warn('Error preservando estilos de imágenes:', e);
+
+                        // Fallback básico
+                        const images = clonedDoc.querySelectorAll('img');
+                        images.forEach(img => {
+                            img.style.objectFit = 'cover';
+                            img.style.objectPosition = 'center';
+                            if (!img.style.width) img.style.width = '100%';
+                            if (!img.style.height) img.style.height = '100%';
+                        });
+                    }
+
+                    // CRÍTICO: Preservar las fuentes originales del workspace de manera simplificada
+                    // Intentar preservar fuentes de los elementos clonados directamente
+                    const textElements = clonedDoc.querySelectorAll('[class*="text-"], p, span, div, h1, h2, h3, h4, h5, h6, [contenteditable]');
+                    textElements.forEach(el => {
+                        // Preservar las clases originales que pueden contener información de fuentes
+                        const originalClasses = el.className;
+                        if (originalClasses) {
+                            el.className = originalClasses;
+                        }
+
+                        // Mantener las fuentes inline si existen
+                        const computedStyle = getComputedStyle ? getComputedStyle(el) : null;
+                        if (computedStyle) {
+                            if (computedStyle.fontFamily && computedStyle.fontFamily !== 'Arial') {
+                                el.style.fontFamily = computedStyle.fontFamily;
+                            }
+                            if (computedStyle.fontSize) {
+                                el.style.fontSize = computedStyle.fontSize;
+                            }
+                            if (computedStyle.fontWeight) {
+                                el.style.fontWeight = computedStyle.fontWeight;
+                            }
+                            if (computedStyle.fontStyle) {
+                                el.style.fontStyle = computedStyle.fontStyle;
+                            }
+                        }
+                    });
+
+                    // CSS adicional para asegurar backgrounds y fuentes
+                    const style = clonedDoc.createElement('style');
+                    style.textContent = `
+                        /* Preservar fuentes originales y NO forzar Arial */
+                        * { 
+                            -webkit-font-smoothing: antialiased !important;
+                            -moz-osx-font-smoothing: grayscale !important;
+                        }
+                        
+                        /* CRÍTICO: Asegurar que las imágenes mantengan cover + CALIDAD HD */
+                        img {
+                            object-fit: cover !important;
+                            object-position: center !important;
+                            image-rendering: -webkit-optimize-contrast !important;
+                            image-rendering: crisp-edges !important;
+                            image-rendering: high-quality !important;
+                        }
+                        
+                        /* CRÍTICO: Asegurar que los backgrounds de página se mantengan en cover */
+                        [id^="page-"] {
+                            background-size: cover !important;
+                            background-position: center !important;
+                            background-repeat: no-repeat !important;
+                        }
+                        
+                        /* Asegurar que los elementos de texto mantengan sus fuentes */
+                        [class*="text-"], p, span, div, h1, h2, h3, h4, h5, h6 {
+                            font-family: inherit !important;
+                        }
+                    `;
+                    clonedDoc.head.appendChild(style);
+                }
+            };
+
+            // Capturar con html2canvas
+            const canvas = await html2canvas(workspaceElement, options);
+
+            // Redimensionar si es necesario
+            if (size.width !== canvas.width || size.height !== canvas.height) {
+                const resizeCanvas = document.createElement('canvas');
+                resizeCanvas.width = size.width;
+                resizeCanvas.height = size.height;
+                const ctx = resizeCanvas.getContext('2d');
+
+                // Calcular dimensiones manteniendo aspecto
+                const aspect = canvas.width / canvas.height;
+                const targetAspect = size.width / size.height;
+
+                let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+
+                if (aspect > targetAspect) {
+                    drawWidth = size.width;
+                    drawHeight = size.width / aspect;
+                    offsetY = (size.height - drawHeight) / 2;
+                } else {
+                    drawHeight = size.height;
+                    drawWidth = size.height * aspect;
+                    offsetX = (size.width - drawWidth) / 2;
+                }
+
+                // Fondo
+                ctx.fillStyle = pages[pageIndex]?.backgroundColor || '#ffffff';
+                ctx.fillRect(0, 0, size.width, size.height);
+
+                // Dibujar imagen redimensionada
+                ctx.drawImage(canvas, offsetX, offsetY, drawWidth, drawHeight);
+
+                const dataUrl = resizeCanvas.toDataURL('image/png', 1.0); // 🚀 Máxima calidad
+                console.log('th [3353]:', dataUrl)
+
+                // Restaurar página original
+                if (pageIndex !== originalPage) {
+                    setCurrentPage(originalPage);
+                }
+
+                return dataUrl;
+            }
+
+            // Restaurar página original
+            if (pageIndex !== originalPage) {
+                setCurrentPage(originalPage);
+            }
+
+            const dataURL = canvas.toDataURL('image/png', 1.0); // 🚀 Máxima calidad
+            console.log('th [3369]:', dataURL)
+            return dataURL
+
+        } catch (error) {
+            console.error('❌ Error generando thumbnail de alta calidad:', error);
+            return null;
+        }
+    }, [pages, currentPage, setCurrentPage]);
 
     // Actualizar dimensiones cuando cambie el preset o el tamaño del workspace
     useEffect(() => {
@@ -1970,6 +3271,20 @@ export default function EditorLibro() {
         return () => window.removeEventListener('resize', handleResize);
     }, [presetData, workspaceSize]);
 
+    // ⚡ useEffect optimizado para generar thumbnail de página actual
+    useEffect(() => {
+        // 🚀 CRÍTICO VPS: No ejecutar en entorno servidor
+        if (isServer) return;
+
+        if (pages[currentPage] && !pageThumbnails[pages[currentPage].id]) {
+            // Generar thumbnail solo de la página actual con delay para estabilidad
+            const timeoutId = setTimeout(() => {
+                generateCurrentPageThumbnail();
+            }, 500); // Delay para asegurar que el DOM se haya actualizado
+
+            return () => clearTimeout(timeoutId);
+        }
+    }, [currentPage, pages, pageThumbnails, generateCurrentPageThumbnail]);
 
     // useEffect para verificar imagen de fondo (solo cuando cambia la página o la imagen)
     useEffect(() => {
@@ -1990,6 +3305,25 @@ export default function EditorLibro() {
                 });
         }
     }, [currentPage, pages[currentPage]?.backgroundImage]);
+
+    // useEffect para limpiar miniaturas cuando cambian dimensiones significativamente
+    useEffect(() => {
+        const dimensionsKey = `${workspaceDimensions.width}x${workspaceDimensions.height}`;
+        const lastDimensionsKey = sessionStorage.getItem('lastWorkspaceDimensions');
+
+        if (lastDimensionsKey && lastDimensionsKey !== dimensionsKey && pages.length > 0) {
+            setPageThumbnails({});
+
+            // Generar nueva miniatura para la página actual después de un delay
+            setTimeout(() => {
+                if (pages[currentPage]) {
+                    generateImmediateThumbnail();
+                }
+            }, 800);
+        }
+
+        sessionStorage.setItem('lastWorkspaceDimensions', dimensionsKey);
+    }, [workspaceDimensions.width, workspaceDimensions.height]);
 
     // 🚀 Sistema de guardado inteligente en segundo plano
     useEffect(() => {
@@ -2749,6 +4083,15 @@ export default function EditorLibro() {
                     return newMap;
                 });
 
+                // 🖼️ Regenerar thumbnail de la página actual después de guardar
+                if (pages && pages.length > 0) {
+                    setTimeout(() => {
+                        generateCurrentPageThumbnail().catch(error => {
+                            console.warn('⚠️ Error regenerando thumbnail de página actual:', error);
+                        });
+                    }, 300);
+                }
+
                 return true;
             } else {
                 const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
@@ -2760,7 +4103,7 @@ export default function EditorLibro() {
             console.error('❌ [AUTO-SAVE] Error en auto-save con procesamiento de imágenes:', error);
             return false;
         }
-    }, [pages, currentPage, workspaceDimensions, workspaceSize, projectData?.id, itemData?.name, itemData?.id, presetData?.id, processAndSaveImages]); // ⚡ OPTIMIZACIÓN: Reducidas dependencias innecesarias
+    }, [pages, currentPage, workspaceDimensions, workspaceSize, projectData?.id, itemData?.name, itemData?.id, presetData?.id, processAndSaveImages, generateLocalThumbnails]); // ⚡ OPTIMIZACIÓN: Reducidas dependencias innecesarias
 
     // 💾 ⚡ OPTIMIZACIÓN: Auto-save menos agresivo cada 10 minutos (reducido impacto)
     useEffect(() => {
@@ -2778,6 +4121,60 @@ export default function EditorLibro() {
     // 🚫 DESHABILITADO: Auto-save automático cuando cambian las páginas
     // Ahora solo guardado manual + respaldo cada 5 minutos
 
+
+    // �️ Función para capturar thumbnails de todas las páginas
+    const captureAllPageThumbnails = useCallback(async () => {
+        if (!pages.length) return {};
+
+        const thumbnails = {};
+        const originalPage = currentPage;
+
+        try {
+            // Capturar thumbnail de cada página
+            for (let i = 0; i < pages.length; i++) {
+                const page = pages[i];
+                if (!page?.id) continue;
+
+                try {
+                    // Cambiar a la página para capturar su thumbnail
+                    if (i !== currentPage) {
+                        setCurrentPage(i);
+                        // Esperar a que se renderice la página
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+
+                    // Capturar thumbnail de la página actual
+                    const thumbnail = await captureCurrentWorkspace({ type: 'thumbnail' });
+                    if (thumbnail) {
+                        thumbnails[page.id] = thumbnail;
+                        //console.log(`✅ [THUMBNAILS] Thumbnail capturado para página ${i + 1}: ${page.id}`);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ [THUMBNAILS] Error capturando thumbnail para página ${page.id}:`, error);
+                    // Mantener el thumbnail existente si hay error
+                    if (pageThumbnails[page.id]) {
+                        thumbnails[page.id] = pageThumbnails[page.id];
+                    }
+                }
+            }
+
+            // Regresar a la página original
+            if (originalPage !== currentPage) {
+                setCurrentPage(originalPage);
+            }
+
+            return thumbnails;
+
+        } catch (error) {
+            console.error('❌ [THUMBNAILS] Error capturando thumbnails:', error);
+            // Regresar a la página original en caso de error
+            if (originalPage !== currentPage) {
+                setCurrentPage(originalPage);
+            }
+            return pageThumbnails; // Retornar thumbnails existentes
+        }
+    }, [pages, currentPage, setCurrentPage, captureCurrentWorkspace, pageThumbnails]);
+
     // �💾 FUNCIÓN DE GUARDADO MANUAL
     const saveProgressManually = useCallback(async () => {
         if (!projectData?.id || pages.length === 0) {
@@ -2786,6 +4183,12 @@ export default function EditorLibro() {
         }
 
         try {
+            // 🖼️ PASO 1: Asegurar que la página actual tenga thumbnail
+            await generateCurrentPageThumbnail();
+
+            // �️ PASO 2: Cargar thumbnails con nueva estructura
+            await loadThumbnailsWithNewStructure();
+
             // �💾 PASO 3: Guardar el proyecto
             const success = await autoSaveToDatabase(pages, true); // force = true para guardado manual
 
@@ -2801,7 +4204,7 @@ export default function EditorLibro() {
             toast.error('Error al guardar el progreso');
             return false;
         }
-    }, [autoSaveToDatabase, pages, projectData?.id, workspaceDimensions, presetData]);
+    }, [autoSaveToDatabase, pages, projectData?.id, workspaceDimensions, presetData, generateLocalThumbnails]);
 
     // Función simplificada para guardado desde la cola (con menos dependencias)
     const saveFromQueue = useCallback(async (pagesToSave) => {
@@ -2830,6 +4233,7 @@ export default function EditorLibro() {
 
             const requestData = {
                 design_data: designData,
+                thumbnails: pageThumbnails
             };
 
             log('📤 [QUEUE-SAVE] Enviando petición al servidor...');
@@ -2860,7 +4264,7 @@ export default function EditorLibro() {
             error('❌ [QUEUE-SAVE] Error guardando desde cola:', error);
             return false;
         }
-    }, [projectData?.id, currentPage, workspaceDimensions]);
+    }, [projectData?.id, currentPage, workspaceDimensions, pageThumbnails]);
 
     // Función para procesar la cola de guardado en segundo plano (versión corregida)
     const processSaveQueue = useCallback(async () => {
@@ -3111,6 +4515,21 @@ export default function EditorLibro() {
         }
     }, [setPages, setHistory, setHistoryIndex, setPageThumbnails]);
 
+    // Descartar progreso guardado
+    const handleDiscardProgress = useCallback(async () => {
+        try {
+
+            // Limpiar localStorage
+            const storageKey = autoSave.getStorageKey();
+            localStorage.removeItem(storageKey);
+
+            toast.success('Progreso anterior eliminado');
+
+        } catch (error) {
+            console.error('❌ [RECOVERY] Error descartando progreso:', error);
+        }
+    }, [autoSave]);
+
     // Efecto para inicializar páginas cuando se cargan los datos del proyecto
     useEffect(() => {
         if (projectData && itemData && presetData) {
@@ -3147,6 +4566,28 @@ export default function EditorLibro() {
             checkAndStartAutoTour();
         }
     }, [projectData?.id, isLoading, pages.length, hasInitializedProgress, checkAndStartAutoTour]);
+
+    // Cargar thumbnails existentes cuando las páginas se cargan
+    useEffect(() => {
+        // Limpiar timeout anterior si existe
+        if (thumbnailLoadTimeoutRef.current) {
+            clearTimeout(thumbnailLoadTimeoutRef.current);
+        }
+
+        if (projectData?.id && pages.length > 0) {
+            // Debounce de 500ms para evitar llamadas excesivas
+            thumbnailLoadTimeoutRef.current = setTimeout(() => {
+                loadThumbnailsWithNewStructure();
+            }, 500);
+        }
+
+        // Cleanup al desmontar o cambiar dependencias
+        return () => {
+            if (thumbnailLoadTimeoutRef.current) {
+                clearTimeout(thumbnailLoadTimeoutRef.current);
+            }
+        };
+    }, [projectData?.id, pages.length]); // Removed loadThumbnailsWithNewStructure to avoid infinite loop
 
     // Función para crear páginas basadas en el preset
     const createPagesFromPreset = (preset, item) => {
@@ -3254,6 +4695,31 @@ export default function EditorLibro() {
         }
     };
 
+    // Función para obtener el título de la página actual
+    const getCurrentPageTitle = () => {
+        if (pages.length === 0) return "Cargando...";
+
+        const page = pages[currentPage];
+        if (!page) return "Página";
+        switch (page.type) {
+            case "cover":
+                return "Portada";
+            case "content":
+                return `Página ${page.pageNumber || (currentPage)}`;
+            case "final":
+                return "Contraportada";
+            default:
+                return `Página ${currentPage + 1}`;
+        }
+    };
+
+    // Función para verificar si la página actual es editable
+    const isCurrentPageEditable = () => {
+        if (pages.length === 0) return false;
+        const page = pages[currentPage];
+        // Todas las páginas son editables, incluida portada y contraportada si existen
+        return !!page;
+    };
 
     // 🎯 FUNCIÓN: Organizar páginas con lógica correcta de libro
     const organizeBookPages = useCallback((pages) => {
@@ -3647,6 +5113,422 @@ export default function EditorLibro() {
         }
     }, [currentPage, pages, getStorageKey]);
     // Función para exportar el proyecto como PDF usando el backend optimizado
+    const handleExportPDF = async () => {
+        if (!projectData?.id) {
+            toast.error('No se ha cargado ningún proyecto.');
+            return;
+        }
+
+        // Evitar múltiples ejecuciones simultáneas
+        if (isPDFGenerating) {
+            toast.warning('⏳ Ya se está generando un PDF. Por favor espera...');
+            return;
+        }
+
+        // Activar estado de loading
+        setIsPDFGenerating(true);
+
+        // Mostrar loading con mensaje específico y información útil
+        const loadingToast = toast.loading('🖨️ Generando PDF de alta calidad (300 DPI)...\n⏱️ Este proceso puede tomar varios minutos\n📁 El archivo se descargará automáticamente', {
+            duration: 0 // No auto-dismiss
+        });
+
+        try {
+            // Primero validar que el proyecto tenga contenido
+            if (!pages || pages.length === 0) {
+                toast.dismiss(loadingToast);
+                toast.error('El proyecto no tiene páginas para exportar.');
+                return;
+            }
+
+            // Verificar que las páginas tengan contenido real
+            const pagesWithContent = pages.filter(page =>
+                page.cells &&
+                page.cells.length > 0 &&
+                page.cells.some(cell =>
+                    cell.elements &&
+                    cell.elements.length > 0
+                )
+            );
+
+            if (pagesWithContent.length === 0) {
+                toast.dismiss(loadingToast);
+                toast.error('Las páginas del proyecto están vacías. Agrega contenido antes de generar el PDF.');
+                return;
+            }
+
+
+
+            // Configuración optimizada para PDFs grandes
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+            }, 300000); // 5 minutos de timeout
+
+            const requestConfig = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Accept': 'application/pdf',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Cache-Control': 'no-cache'
+                },
+                credentials: 'same-origin',
+                signal: controller.signal,
+                body: JSON.stringify({
+                    quality: 'high',
+                    dpi: 300,
+                    includeBackgrounds: true,
+                    optimize: true,
+                    pages: pagesWithContent,  // Enviar los datos completos de las páginas
+                    projectData: {
+                        id: projectData.id,
+                        name: projectData.name,
+                        design_data: {
+                            pages: pagesWithContent
+                        }
+                    }
+                })
+            };
+
+            // Actualizar mensaje de progreso
+            toast.loading('📊 Procesando ' + pagesWithContent.length + ' páginas...\n⏱️ Por favor mantén esta pestaña abierta', {
+                id: loadingToast
+            });
+
+            // Intentar la ruta de test que sabemos que funciona
+            let response;
+
+            // Usar URL absoluta para asegurar que vaya al servidor Laravel correcto
+            const baseUrl = window.location.hostname === 'localhost' && window.location.port === '5174'
+                ? 'http://127.0.0.1:8000'  // Si estamos en Vite dev server, usar Laravel server
+                : '';  // Si estamos en servidor normal, usar ruta relativa
+
+
+
+            try {
+                response = await fetch(`${baseUrl}/api/test/projects/${projectData.id}/export/pdf`, requestConfig);
+
+            } catch (networkError) {
+                console.error('🚨 [PDF-EXPORT] Error de red:', {
+                    error: networkError,
+                    message: networkError.message,
+                    name: networkError.name
+                });
+
+                if (networkError.name === 'AbortError') {
+                    throw new Error('Timeout: El PDF está tardando demasiado en generarse. Intenta con menos páginas.');
+                }
+
+                console.warn('⚠️ [PDF-EXPORT] Error en ruta de test, intentando ruta autenticada...');
+                // Si falla, intentar la ruta principal autenticada
+                try {
+                    response = await fetch(`${baseUrl}/api/customer/projects/${projectData.id}/export/pdf`, requestConfig);
+                } catch (fallbackError) {
+                    if (fallbackError.name === 'AbortError') {
+                        throw new Error('Timeout: El PDF está tardando demasiado en generarse. Intenta con menos páginas.');
+                    }
+
+                    console.error('❌ [PDF-EXPORT] Todas las rutas fallaron:', fallbackError);
+                    throw new Error(`Error de conexión al generar el PDF: ${fallbackError.message}`);
+                }
+            }
+
+            // Limpiar timeout
+            clearTimeout(timeoutId);
+
+            // Si la ruta de test da 401 o 404, intentar ruta autenticada
+            if (!response.ok && (response.status === 401 || response.status === 404)) {
+                console.warn('⚠️ [PDF-EXPORT] Ruta de test falló, intentando ruta autenticada...');
+                try {
+                    const fallbackConfig = { ...requestConfig };
+                    delete fallbackConfig.signal; // Nuevo request sin el signal anterior
+
+                    response = await fetch(`${baseUrl}/api/customer/projects/${projectData.id}/export/pdf`, fallbackConfig);
+
+                } catch (fallbackError) {
+                    console.error('❌ [PDF-EXPORT] Ruta autenticada también falló:', fallbackError);
+                    throw new Error('Error de conexión al generar el PDF. Verifica tu conexión a internet.');
+                }
+            }
+
+            if (response.ok) {
+                const contentType = response.headers.get('content-type');
+
+                if (contentType && contentType.includes('application/pdf')) {
+                    // Actualizar mensaje de progreso para descarga
+                    toast.loading('📦 Descargando PDF...\n⏬ Preparando archivo', {
+                        id: loadingToast
+                    });
+
+                    try {
+                        // Usar blob() directamente para evitar ERR_CONTENT_LENGTH_MISMATCH
+                        const blob = await response.blob();
+
+                        if (blob.size > 0) {
+                            const fileName = `${projectData.name || 'proyecto'}_${new Date().toISOString().split('T')[0]}.pdf`;
+                            const fileSizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+
+                            // Disparar descarga
+                            saveAs(blob, fileName);
+
+                            // Limpiar loading toast y mostrar éxito
+                            toast.dismiss(loadingToast);
+                            toast.success(`✅ PDF descargado exitosamente!\n📄 Archivo: ${fileName}\n📦 Tamaño: ${fileSizeMB} MB\n📁 Ubicación: Carpeta de Descargas`, {
+                                duration: 8000
+                            });
+
+
+                        } else {
+                            console.error('❌ [PDF-EXPORT] PDF blob está vacío');
+                            toast.dismiss(loadingToast);
+                            toast.error('El PDF generado está vacío. Verifica que el proyecto tenga contenido.');
+                        }
+                    } catch (blobError) {
+                        console.error('❌ [PDF-EXPORT] Error al procesar blob:', blobError);
+                        toast.dismiss(loadingToast);
+                        toast.error(`Error al procesar el PDF: ${blobError.message}`);
+                    }
+                } else {
+                    // La respuesta no es un PDF, probablemente un error JSON
+                    const errorData = await response.json();
+                    const errorMessage = errorData.message || 'Error desconocido al generar el PDF.';
+                    toast.dismiss(loadingToast);
+                    toast.error(`❌ ${errorMessage}`);
+                    console.error('❌ [PDF-EXPORT] Error del servidor:', errorData);
+                }
+            } else {
+                // Error HTTP
+                try {
+                    const errorData = await response.json();
+                    const errorMessage = errorData.message || `Error HTTP ${response.status}`;
+
+                    toast.dismiss(loadingToast);
+
+                    // Manejo específico para errores de autenticación
+                    if (response.status === 401) {
+                        toast.error('❌ Sesión expirada. Por favor, inicia sesión nuevamente.');
+                    } else if (response.status === 403) {
+                        toast.error('❌ No tienes permisos para exportar este proyecto.');
+                    } else if (response.status === 404) {
+                        toast.error('❌ Proyecto no encontrado. Verifica que el proyecto exista.');
+                    } else if (response.status === 413) {
+                        toast.error('❌ El proyecto es demasiado grande para generar PDF. Intenta reducir el número de páginas o imágenes.');
+                    } else if (response.status === 500) {
+                        toast.error('❌ Error del servidor. El proyecto puede ser demasiado complejo o grande.');
+                    } else {
+                        toast.error(`❌ ${errorMessage}`);
+                    }
+
+                    console.error('❌ [PDF-EXPORT] Error HTTP:', {
+                        status: response.status,
+                        error: errorData
+                    });
+                } catch (parseError) {
+                    toast.dismiss(loadingToast);
+
+                    // El servidor devolvió HTML en lugar de JSON (típico en páginas de error)
+                    if (response.status === 404) {
+                        toast.error('❌ Endpoint de PDF no encontrado. Verifica la configuración del servidor.');
+                    } else if (response.status === 401) {
+                        toast.error('❌ Sesión expirada. Por favor, inicia sesión nuevamente.');
+                    } else if (response.status === 413) {
+                        toast.error('❌ El proyecto es demasiado grande. Intenta reducir el contenido.');
+                    } else {
+                        toast.error(`❌ Error del servidor (${response.status}). El proyecto puede ser demasiado grande o complejo.`);
+                    }
+                    console.error('❌ [PDF-EXPORT] Error parseando respuesta de error:', parseError);
+                }
+            }
+        } catch (error) {
+            toast.dismiss(loadingToast);
+            console.error('❌ [PDF-EXPORT] Error de red:', error);
+
+            if (error.message.includes('Timeout')) {
+                toast.error('⏱️ ' + error.message);
+            } else if (error.name === 'AbortError') {
+                toast.error('❌ Operación cancelada. El PDF tardó demasiado en generarse.');
+            } else {
+                toast.error('❌ Error de conexión al generar el PDF. Verifica tu conexión a internet.');
+            }
+        } finally {
+            // Desactivar estado de loading
+            setIsPDFGenerating(false);
+        }
+    };
+
+    // PDF RÁPIDO con thumbnails del backend
+    const handleExportPDFFromBackendThumbnails = async () => {
+        if (!projectData?.id) {
+            toast.error('No se ha cargado ningún proyecto.');
+            return;
+        }
+
+        if (isPDFGenerating) {
+            toast.warning('⏳ Ya se está generando un PDF. Por favor espera...');
+            return;
+        }
+
+        setIsPDFGenerating(true);
+        const loadingToast = toast.loading('⚡ Generando PDF rápido...', { duration: 0 });
+
+        try {
+
+
+            // Opción 1: Intentar usar thumbnails existentes del frontend
+            const hasExistingThumbnails = Object.keys(pageThumbnails).length > 0;
+
+            if (hasExistingThumbnails) {
+
+                // Crear PDF con thumbnails existentes
+                const pdf = new jsPDF({
+                    orientation: workspaceDimensions.width > workspaceDimensions.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [workspaceDimensions.width, workspaceDimensions.height]
+                });
+
+                let pagesAdded = 0;
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const thumbnailUrl = pageThumbnails[page.id];
+
+                    if (thumbnailUrl) {
+                        try {
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+
+                            await new Promise((resolve, reject) => {
+                                img.onload = () => {
+                                    resolve();
+                                };
+                                img.onerror = (error) => {
+                                    reject(error);
+                                };
+                                img.src = thumbnailUrl;
+                            });
+
+                            if (pagesAdded > 0) pdf.addPage();
+                            pdf.addImage(img, 'PNG', 0, 0, workspaceDimensions.width, workspaceDimensions.height);
+                            pagesAdded++;
+
+                        } catch (imgError) {
+                            console.error(`❌ Error procesando página ${i + 1}:`, imgError);
+                        }
+                    } else {
+                        console.warn(`⚠️ No hay thumbnail para página ${i + 1} (ID: ${page.id})`);
+                    }
+                }
+
+                if (pagesAdded > 0) {
+                    const fileName = `${projectData.name || 'proyecto'}_rapido_${new Date().toISOString().split('T')[0]}.pdf`;
+                    pdf.save(fileName);
+
+                    toast.dismiss(loadingToast);
+                    toast.success(`⚡ PDF rápido generado: ${fileName} (${pagesAdded} páginas)`);
+                    return;
+                } else {
+                    throw new Error('No se pudo procesar ninguna página');
+                }
+            }
+
+
+            const response = await fetch(`/api/thumbnails/${projectData.id}/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({
+                    pages: pages.map(page => ({
+                        id: page.id,
+                        type: page.type,
+                        cells: page.cells,
+                        layout: page.layout,
+                        backgroundColor: page.backgroundColor,
+                        backgroundImage: page.backgroundImage
+                    })),
+                    workspaceDimensions: workspaceDimensions,
+                    width: workspaceDimensions.width,
+                    height: workspaceDimensions.height,
+                    quality: 95,
+                    scale: 4,
+                    dpi: 300
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Error del servidor:', errorText);
+                throw new Error(`Error del servidor: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.thumbnails || Object.keys(data.thumbnails).length === 0) {
+                throw new Error('El backend no devolvió thumbnails');
+            }
+
+            // Crear PDF con thumbnails del backend
+            const pdf = new jsPDF({
+                orientation: workspaceDimensions.width > workspaceDimensions.height ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [workspaceDimensions.width, workspaceDimensions.height]
+            });
+
+            let pagesAdded = 0;
+            for (let i = 0; i < pages.length; i++) {
+                const page = pages[i];
+                const thumbnailUrl = data.thumbnails[page.id];
+
+                if (thumbnailUrl) {
+                    try {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+
+                        await new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                resolve();
+                            };
+                            img.onerror = (error) => {
+                                console.error(`❌ Error cargando imagen backend página ${i + 1}:`, error);
+                                reject(error);
+                            };
+                            img.src = thumbnailUrl;
+                        });
+
+                        if (pagesAdded > 0) pdf.addPage();
+                        pdf.addImage(img, 'PNG', 0, 0, workspaceDimensions.width, workspaceDimensions.height);
+                        pagesAdded++;
+
+                    } catch (imgError) {
+                        console.error(`❌ Error procesando página ${i + 1}:`, imgError);
+                    }
+                } else {
+                    console.warn(`⚠️ No hay thumbnail del backend para página ${i + 1} (ID: ${page.id})`);
+                }
+            }
+
+            if (pagesAdded === 0) {
+                throw new Error('No se pudo procesar ninguna página');
+            }
+
+            const fileName = `${projectData.name || 'proyecto'}_rapido_${new Date().toISOString().split('T')[0]}.pdf`;
+            pdf.save(fileName);
+
+            toast.dismiss(loadingToast);
+            toast.success(`⚡ PDF rápido generado: ${fileName} (${pagesAdded} páginas)`);
+
+        } catch (error) {
+            console.error('❌ [PDF-THUMBNAILS] Error completo:', error);
+            toast.dismiss(loadingToast);
+            toast.error('❌ Error al generar PDF rápido: ' + error.message);
+        } finally {
+            setIsPDFGenerating(false);
+        }
+    };
+
+
 
 
 
@@ -3682,19 +5564,201 @@ export default function EditorLibro() {
         setSelectedCell(null);
     };
 
+    // Añadir una nueva página de contenido
+    const addPage = () => {
+        if (!presetData) return;
+
+        // Encontrar el último número de página de contenido
+        const contentPages = pages.filter(p => p.type === "content");
+        const lastPageNumber = contentPages.length > 0
+            ? Math.max(...contentPages.map(p => p.pageNumber))
+            : 0;
+
+        const newPageNumber = lastPageNumber + 1;
+        const newPageId = `page-content-${newPageNumber}`;
+
+        const newPage = {
+            id: newPageId,
+            type: "content",
+            pageNumber: newPageNumber,
+            layout: "layout-1",
+            backgroundImage: itemData?.content_image ? `/storage/images/item/${itemData.content_image}` : null,
+            backgroundColor: !itemData?.content_image ? (presetData?.background_color || "#ffffff") : null,
+            cells: [{
+                id: `cell-content-${newPageNumber}-1`,
+                elements: [
+                    // Número de página
+                    {
+                        id: `page-number-${newPageNumber}`,
+                        type: "text",
+                        content: `Página ${newPageNumber}`,
+                        position: { x: 5, y: 5 },
+                        size: { width: 20, height: 8 },
+                        style: {
+                            fontSize: "14px",
+                            fontFamily: "Arial",
+                            color: "#666666",
+                            textAlign: "left"
+                        },
+                        zIndex: 1
+                    },
+                    // Área de contenido editable
+                    {
+                        id: `content-area-${newPageNumber}`,
+                        type: "text",
+                        content: "Haz clic para agregar contenido...",
+                        position: { x: 10, y: 20 },
+                        size: { width: 80, height: 60 },
+                        style: {
+                            fontSize: "16px",
+                            fontFamily: "Arial",
+                            color: "#999999",
+                            textAlign: "center"
+                        },
+                        zIndex: 1
+                    }
+                ]
+            }]
+        };
+
+        // Insertar antes de la página final
+        const updatedPages = [...pages];
+        const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
+
+        if (finalPageIndex > -1) {
+            updatedPages.splice(finalPageIndex, 0, newPage);
+        } else {
+            updatedPages.push(newPage);
+        }
+
+        updatePages(updatedPages);
+
+        // Navegar a la nueva página
+        const newPageIndex = updatedPages.findIndex(p => p.id === newPageId);
+        setCurrentPage(newPageIndex);
+    };
+
+    // Eliminar la página actual (solo páginas de contenido)
+    const deleteCurrentPage = () => {
+        if (pages.length <= 3) return; // Mínimo: portada + 1 contenido + final
+
+        const currentPageData = pages[currentPage];
+
+        // No permitir borrar portada ni contraportada
+        if (currentPageData.type === "cover" || currentPageData.type === "final") {
+            return;
+        }
+
+        // Confirmar eliminación
+        if (!confirm(`¿Estás seguro de eliminar la ${currentPageData.type === "content" ? `página ${currentPageData.pageNumber}` : "página"}?`)) {
+            return;
+        }
+
+        const updatedPages = pages.filter((_, index) => index !== currentPage);
+        updatePages(updatedPages);
+        setCurrentPage(Math.min(currentPage, updatedPages.length - 1));
+    };
+
+    // Duplicar la página actual (solo páginas de contenido)
+    const duplicateCurrentPage = () => {
+        const currentPageData = pages[currentPage];
+
+        // Solo duplicar páginas de contenido
+        if (currentPageData.type !== "content") {
+            return;
+        }
+
+        // Crear una copia de la página actual
+        const lastPageNumber = Math.max(...pages.filter(p => p.type === "content").map(p => p.pageNumber));
+        const newPageNumber = lastPageNumber + 1;
+
+        const newPage = {
+            ...JSON.parse(JSON.stringify(currentPageData)),
+            id: `page-content-${newPageNumber}`,
+            pageNumber: newPageNumber,
+            cells: currentPageData.cells.map(cell => ({
+                ...cell,
+                id: `cell-content-${newPageNumber}-${cell.id.split('-').pop()}`,
+                elements: cell.elements.map(element => ({
+                    ...element,
+                    id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                }))
+            }))
+        };
+
+        // Insertar antes de la página final
+        const updatedPages = [...pages];
+        const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
+
+        if (finalPageIndex > -1) {
+            updatedPages.splice(finalPageIndex, 0, newPage);
+        } else {
+            updatedPages.push(newPage);
+        }
+
+        updatePages(updatedPages);
+
+        // Navegar a la nueva página
+        const newPageIndex = updatedPages.findIndex(p => p.id === newPage.id);
+        setCurrentPage(newPageIndex);
+    };
+
+    // Añadir una nueva página de contenido
+    const addNewPage = () => {
+        const contentPages = pages.filter(p => p.type === "content");
+        const newPageNumber = contentPages.length > 0 ? Math.max(...contentPages.map(p => p.pageNumber)) + 1 : 2;
+
+        const newPageId = `page-content-${Date.now()}`;
+        const newPage = {
+            id: newPageId,
+            type: 'content',
+            pageNumber: newPageNumber,
+            backgroundColor: presetData?.background_color || '#ffffff',
+            backgroundImage: itemData?.content_image ? `/storage/images/item/${itemData.content_image}` : null,
+            layout: 'double',
+            cells: [
+                {
+                    id: `cell-${Date.now()}-1`,
+                    position: { x: 0.05, y: 0.05 },
+                    size: { width: 0.4, height: 0.9 },
+                    elements: []
+                },
+                {
+                    id: `cell-${Date.now()}-2`,
+                    position: { x: 0.55, y: 0.05 },
+                    size: { width: 0.4, height: 0.9 },
+                    elements: []
+                }
+            ]
+        };
+
+        // Insertar antes de la página final
+        const updatedPages = [...pages];
+        const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
+
+        if (finalPageIndex > -1) {
+            updatedPages.splice(finalPageIndex, 0, newPage);
+        } else {
+            updatedPages.push(newPage);
+        }
+
+        updatePages(updatedPages);
+
+        // Navegar a la nueva página
+        const newPageIndex = updatedPages.findIndex(p => p.id === newPage.id);
+        setCurrentPage(newPageIndex);
+    };
+
     // Añadir un elemento a una celda
     const addElementToCell = (cellId, element) => {
-        setPages(prev => {
-            const updatedPages = [...prev];
-            // Ensure we only add to the correct cell
-            const cellIndex = updatedPages[currentPage].cells.findIndex(cell => cell.id === cellId);
-
-            if (cellIndex !== -1) {
-                updatedPages[currentPage].cells[cellIndex].elements.push(element);
+        const updatedPages = [...pages];
+        // Asegurarse de que solo se agrega a la celda correcta
+        for (let i = 0; i < updatedPages[currentPage].cells.length; i++) {
+            if (updatedPages[currentPage].cells[i].id === cellId) {
+                updatedPages[currentPage].cells[i].elements.push(element);
             }
-
-            return updatedPages;
-        });
+        }
+        updatePages(updatedPages);
         setSelectedElement(element.id);
         setSelectedCell(cellId);
     };
@@ -3775,6 +5839,34 @@ export default function EditorLibro() {
 
 
                 updatedPages[currentPage].cells[cellIndex].elements[elementIndex] = updatedElement;
+
+                // 🎨 REGENERACIÓN AUTOMÁTICA DE THUMBNAILS CUANDO CAMBIAN FILTROS O MÁSCARAS
+                if (updates.filters || updates.mask) {
+
+                    // 🚨 SOLUCIÓN CRÍTICA: Limpiar caché cuando se detectan cambios de filtros/máscaras
+                    if (window.FORCE_THUMBNAIL_REGENERATION) {
+                        window.thumbnailCache = {};
+                    }
+
+                    // Regeneración inmediata sin delay
+                    generateCurrentPageThumbnail(true).then(() => {
+
+                        // 🚨 SOLUCIÓN CRÍTICA: Forzar regeneración secundaria para garantizar actualización
+                        if (window.FORCE_THUMBNAIL_REGENERATION && window.forceRegenerateThumbnail) {
+                            setTimeout(() => {
+                                try {
+                                    window.forceRegenerateThumbnail();
+                                } catch (error) {
+                                    console.error('❌ [FORZADO-EMERGENCIA] Error en regeneración secundaria:', error);
+                                }
+                            }, 150);
+                        }
+                    }).catch(error => {
+                        console.error('❌ [AUTO-REGEN] Error regenerando thumbnail:', error);
+                    });
+                } else {
+                    //  console.log('🚫 [AUTO-REGEN] No hay cambios en filtros/máscaras, saltando regeneración');
+                }
             }
 
             return updatedPages;
@@ -3798,6 +5890,146 @@ export default function EditorLibro() {
         }
     }, [currentPage, debouncedUpdatePages]);
 
+    // � FFUNCIÓN DE TESTING PARA LAYOUTS COMPLEJOS
+    const testComplexLayoutThumbnail = useCallback(() => {
+        const currentLayout = getCurrentLayout();
+        console.log('🧪 [TEST] Layout actual:', currentLayout);
+        console.log('🧪 [TEST] Es complejo:', currentLayout.isComplex);
+        console.log('🧪 [TEST] CellStyles:', currentLayout.cellStyles);
+
+        // Forzar regeneración con el nuevo método
+        generateCurrentPageThumbnail(true);
+
+        return `✅ Test ejecutado para layout: ${currentLayout.id} (complejo: ${currentLayout.isComplex})`;
+    }, [getCurrentLayout, generateCurrentPageThumbnail]);
+
+    // Exponer función de test globalmente
+    window.testComplexLayoutThumbnail = testComplexLayoutThumbnail;
+
+    // 🚨 FUNCIONES DE DEBUG PARA TESTING DE THUMBNAILS CON FILTROS (DESPUÉS DE updateElementInCell)
+    const forceRegenerateThumbnail = useCallback(() => {
+        // 🚀 CRÍTICO VPS: No ejecutar en entorno servidor
+        if (isServer) {
+            error('🚫 [VPS-PROTECTION] forceRegenerateThumbnail bloqueado en servidor');
+            return;
+        }
+
+
+        // Limpiar completamente la caché de thumbnails
+        if (window.thumbnailCache) window.thumbnailCache = {};
+
+        // Marcar los thumbnails como protegidos para evitar regeneración automática posterior
+        window.THUMBNAIL_PROTECTED = true;
+
+        // Inicializar lista de páginas protegidas si no existe
+        if (!window._protectedThumbnailIds) window._protectedThumbnailIds = [];
+
+        // Agregar la página actual a la lista de páginas protegidas
+        const currentPageId = pages[currentPage]?.id;
+        if (currentPageId && !window._protectedThumbnailIds.includes(currentPageId)) {
+            window._protectedThumbnailIds.push(currentPageId);
+        }
+
+        // Forzar bloqueador temporal de regeneración automática
+        window.BLOCK_AUTO_REGENERATION = true;
+
+        // Ejecutar regeneración forzada
+        generateCurrentPageThumbnail(true);
+
+        // Mantener protección por 10 segundos para evitar que otras regeneraciones la sobreescriban
+        setTimeout(() => {
+            window.BLOCK_AUTO_REGENERATION = false;
+        }, 10000);
+    }, [generateCurrentPageThumbnail]);
+
+    const testFilterApplication = useCallback(() => {
+        if (selectedElement && selectedCell) {
+            updateElementInCell(selectedCell, selectedElement, {
+                filters: {
+                    brightness: 100,
+                    contrast: 100,
+                    saturation: 0, // GRAYSCALE
+                    opacity: 100
+                }
+            });
+        } else {
+            // console.log('⚠️ [TEST] No hay elemento seleccionado');
+        }
+    }, [selectedElement, selectedCell, updateElementInCell]);
+
+    // Función avanzada para bloquear permanentemente cualquier regeneración no autorizada
+    const lockThumbnailsForever = useCallback(() => {
+
+        // Activar solo los bloqueadores necesarios
+        window.THUMBNAIL_PROTECTED = true;
+        window.PERMANENT_THUMBNAIL_LOCK = true;
+        window.BLOCK_AUTO_REGENERATION = false; // Permitir regeneración automática para thumbnails normales
+
+        // Guardar IDs actuales de miniaturas con filtros aplicados
+        window._protectedThumbnailIds = Object.keys(pageThumbnails);
+
+        // 🔒 Sobrescribir la función de regeneración para bloquear cualquier intento
+        const originalGenerateCurrentPageThumbnail = window.forceRegenerateThumbnail;
+
+        // Reemplazar con versión que verifica si ya está protegido
+        window.forceRegenerateThumbnail = (...args) => {
+            if (window._userInitiated) {
+                window._userInitiated = false;
+                return originalGenerateCurrentPageThumbnail(...args);
+            }
+            return false;
+        };
+
+        // Método para permitir regeneración manual explícita
+        window._allowNextRegeneration = () => {
+            window._userInitiated = true;
+        };
+
+        // Crear método seguro para regenerar manualmente
+        window.safeRegenerateThumbnail = () => {
+            window._allowNextRegeneration();
+            window.forceRegenerateThumbnail();
+        };
+
+        // Tomar un snapshot de las miniaturas actuales para evitar pérdida
+        window._thumbnailBackup = { ...pageThumbnails };
+
+        // Mostrar mensaje informativo para el usuario
+        alert('🔒 Miniaturas protegidas exitosamente!\n\nSi necesitas regenerar una miniatura específica, usa window.safeRegenerateThumbnail() en la consola.');
+
+    }, [pageThumbnails]);
+
+    // 🚀 NUEVA FUNCIÓN: Forzar regeneración garantizando filtros
+    const forceRegenerateWithFilters = useCallback(() => {
+
+        // Activar todos los mecanismos para garantizar filtros
+        window.FORCE_FILTER_APPLICATION = true;
+        window.ENABLE_ADVANCED_FILTER_RENDERING = true;
+
+        // Limpiar caches para asegurar regeneración desde cero
+        if (window.thumbnailCache) window.thumbnailCache.clear();
+        if (clearThumbnailCaches) clearThumbnailCaches();
+
+        // Marcar todos los elementos con filtros explícitamente
+        const currentPageData = pages[currentPage];
+        if (currentPageData && currentPageData.cells) {
+            currentPageData.cells.forEach(cell => {
+                if (cell.elements) {
+                    cell.elements.forEach(element => {
+                        if (element.filters) {
+                            element._hasRealFilters = true;
+                            element.pageId = currentPageData.id;
+                        }
+                    });
+                }
+            });
+        }
+
+        // Forzar regeneración
+        generateCurrentPageThumbnail(true);
+
+    }, [pages, currentPage, generateCurrentPageThumbnail]);
+
 
     // Eliminar un elemento de una celda
     const deleteElementFromCell = (cellId, elementId) => {
@@ -3807,12 +6039,10 @@ export default function EditorLibro() {
         );
 
         if (cellIndex !== -1) {
-            updatedPages[currentPage].cells[cellIndex].elements = updatedPages[currentPage].cells[cellIndex].elements.filter(el => el.id !== elementId);
-            setPages(prev => {
-                const newPages = [...prev];
-                newPages[currentPage] = updatedPages[currentPage];
-                return newPages;
-            });
+            updatedPages[currentPage].cells[cellIndex].elements = updatedPages[
+                currentPage
+            ].cells[cellIndex].elements.filter((el) => el.id !== elementId);
+            updatePages(updatedPages);
 
             if (selectedElement === elementId) {
                 setSelectedElement(null);
@@ -3867,6 +6097,10 @@ export default function EditorLibro() {
         }
     };
 
+    // Vista previa de la página actual
+    const togglePreview = () => {
+        setPreviewMode(!previewMode);
+    };
 
     // Añadir texto desde el botón
     const handleAddText = (textType = 'body') => {
@@ -3948,6 +6182,262 @@ export default function EditorLibro() {
         }
     };
 
+    // Aplicar filtro predefinido
+    const applyFilterPreset = (preset) => {
+        if (!selectedElement || !selectedCell) return;
+
+        updateElementInCell(selectedCell, selectedElement, {
+            filters: {
+                ...getSelectedElement()?.filters,
+                ...preset,
+            },
+        });
+    };
+
+    // Sistema optimizado de miniaturas usando useMemo para detectar cambios específicos por página
+    const thumbnailGenerationKey = useMemo(() => {
+        // Crear una clave específica para la página actual
+        const currentPageData = pages[currentPage];
+        if (!currentPageData) return null;
+
+        // Generar un hash más ligero del contenido
+        const allElements = currentPageData.cells?.flatMap(cell => cell.elements || []) || [];
+        const contentHash = allElements.map(el => {
+            // Solo incluir propiedades esenciales para el hash
+            return {
+                id: el.id,
+                type: el.type,
+                position: el.position,
+                size: el.size
+            };
+        });
+
+        const key = {
+            pageId: currentPageData.id,
+            elementsCount: allElements.length,
+            contentHash: JSON.stringify(contentHash).substring(0, 100), // Limitar tamaño del hash
+            backgroundImage: currentPageData.backgroundImage,
+            backgroundColor: currentPageData.backgroundColor,
+            layout: currentPageData.layout
+            // NO incluir timestamp para evitar regeneración constante
+        };
+
+        return key;
+    }, [pages, currentPage]);
+
+    // useEffect optimizado que regenera thumbnails cuando cambia el contenido
+    useEffect(() => {
+        // 🚀 CRÍTICO VPS: No ejecutar en entorno servidor
+        if (isServer) return;
+
+        // Verificar si hay alguna miniatura de página actual
+        const currentPageData = pages[currentPage];
+        if (!currentPageData) return;
+
+        const pageId = currentPageData.id;
+
+        // 🎭 PRESERVAR FILTROS: Solo comprobar si esta página específica tiene filtros aplicados
+        const pageHasFilters = currentPageData?.cells?.some(cell =>
+            cell.elements?.some(element => element.filters &&
+                (element.filters.brightness !== 100 ||
+                    element.filters.contrast !== 100 ||
+                    element.filters.saturation !== 100 ||
+                    element.filters.tint !== 0 ||
+                    element.filters.hue !== 0))
+        );
+
+        // Permitir regeneración siempre, pero registrar si tiene filtros para mejor manejo
+        if (pageHasFilters) {
+            // Registrar como página con filtros para protección futura
+            if (!window._protectedThumbnailIds) window._protectedThumbnailIds = [];
+            if (!window._protectedThumbnailIds.includes(pageId)) {
+                window._protectedThumbnailIds.push(pageId);
+            }
+        }
+
+
+        if (pages.length === 0 || isLoading || !thumbnailGenerationKey) {
+            return;
+        }
+
+        let isCancelled = false;
+
+        const generateThumbnailForCurrentPage = async () => {
+            // 🚨 BLOQUEO SECUNDARIO: Verificar de nuevo por si la protección se activó mientras esperábamos
+            if (window.PREVENT_THUMBNAIL_RESET || window.THUMBNAIL_PROTECTED) {
+                return;
+            }
+
+            try {
+                const currentPageData = pages[currentPage];
+                if (!currentPageData || !currentPageData.id) {
+                    return;
+                }
+
+                const pageId = currentPageData.id;
+
+                // 🚨 PROTECCIÓN CRÍTICA: No eliminar thumbnails protegidos
+                if (!window.PREVENT_THUMBNAIL_RESET && !window.THUMBNAIL_PROTECTED) {
+                    // Eliminar thumbnail existente antes de generar uno nuevo
+                    setPageThumbnails(prev => {
+                        const updated = { ...prev };
+                        delete updated[pageId];
+                        return updated;
+                    });
+                }
+
+                // Esperar un poco para que el DOM se estabilice y el thumbnail se elimine
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+
+                if (isCancelled) {
+                    return;
+                }
+
+                // 🎭 PRESERVAR FILTROS: Asegurar que se usan las opciones correctas para capturar filtros
+                const hasFilters = currentPageData?.cells?.some(cell =>
+                    cell.elements?.some(element => element.filters &&
+                        (element.filters.brightness !== 100 ||
+                            element.filters.contrast !== 100 ||
+                            element.filters.saturation !== 100 ||
+                            element.filters.tint !== 0 ||
+                            element.filters.hue !== 0))
+                );
+
+                // Opciones especiales para capturar filtros si es necesario
+                const captureOptions = hasFilters ? { type: 'thumbnail', preserveFilters: true } : { type: 'thumbnail' };
+
+                const thumbnail = await captureCurrentWorkspace(captureOptions);
+
+
+                if (thumbnail && !isCancelled) {
+                    setPageThumbnails(prev => ({
+                        ...prev,
+                        [pageId]: thumbnail
+                    }));
+
+                    // 🎭 PRESERVAR FILTROS: Si tiene filtros, marcarla como protegida
+                    if (hasFilters) {
+                        if (!window._protectedThumbnailIds) window._protectedThumbnailIds = [];
+                        if (!window._protectedThumbnailIds.includes(pageId)) {
+                            window._protectedThumbnailIds.push(pageId);
+                        }
+                    }
+                } else {
+                    console.warn('⚠️ [DEBUG] No se pudo generar miniatura para:', pageId);
+                }
+            } catch (error) {
+                if (!isCancelled) {
+                    console.error("❌ [DEBUG] Error regenerando miniatura:", error);
+                }
+            }
+        };
+
+        // Debounce para evitar generar thumbnails muy seguido
+        const timeoutId = setTimeout(() => {
+            generateThumbnailForCurrentPage();
+        }, 500); // Reduzco el tiempo para testing
+
+        return () => {
+            isCancelled = true;
+            clearTimeout(timeoutId);
+        };
+    }, [currentPage, thumbnailGenerationKey, isLoading, captureCurrentWorkspace]);
+
+    // Generación de miniaturas en segundo plano (solo para páginas que no tienen miniatura)
+    useEffect(() => {
+        // 🚨 BLOQUEO SELECTIVO: Permitir generación automática pero proteger miniaturas con filtros
+        if (window.BLOCK_AUTO_REGENERATION) {
+            return;
+        }
+
+        if (pages.length === 0 || isLoading) return;
+
+        const generateBackgroundThumbnails = async () => {
+            // 🚨 BLOQUEO SELECTIVO: Verificar solo las páginas con filtros
+            if (window.BLOCK_AUTO_REGENERATION) {
+                return;
+            }
+            return
+
+            // Encontrar páginas sin miniatura
+            const pagesWithoutThumbnails = pages.filter(page => !pageThumbnails[page.id]);
+
+            if (pagesWithoutThumbnails.length === 0) return;
+
+
+            // Generar una por una con pausa entre cada una
+            for (const page of pagesWithoutThumbnails) {
+                try {
+                    // Crear elemento temporal simplificado para la miniatura
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 200;
+                    canvas.height = 150;
+                    const ctx = canvas.getContext('2d');
+
+                    // Fondo
+                    ctx.fillStyle = page.backgroundColor || '#ffffff';
+                    ctx.fillRect(0, 0, 200, 150);
+
+                    // Imagen de fondo si existe
+                    if (page.backgroundImage) {
+                        try {
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            await new Promise((resolve, reject) => {
+                                img.onload = resolve;
+                                img.onerror = reject;
+                                img.src = page.backgroundImage;
+                            });
+                            ctx.drawImage(img, 0, 0, 200, 150);
+                        } catch (imgError) {
+                            console.warn('No se pudo cargar imagen de fondo para miniatura:', imgError);
+                        }
+                    }
+
+                    // Elementos básicos (simplified)
+                    if (page.cells) {
+                        page.cells.forEach(cell => {
+                            if (cell.elements) {
+                                cell.elements.forEach(element => {
+                                    if (element.type === 'text' && element.content) {
+                                        ctx.fillStyle = element.style?.color || '#000000';
+                                        ctx.font = '12px Arial';
+                                        ctx.fillText(
+                                            element.content.substring(0, 20) + (element.content.length > 20 ? '...' : ''),
+                                            10, 30
+                                        );
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+                    console.log('th [6539]:', thumbnail)
+
+                    // setPageThumbnails(prev => ({
+                    //     ...prev,
+                    //     [page.id]: thumbnail
+                    // }));
+
+
+                    // Pausa entre generaciones
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                } catch (error) {
+                    console.error('❌ Error generando miniatura de fondo para:', page.id, error);
+                }
+            }
+        };
+
+        // Ejecutar después de un delay para no interferir con la página actual
+        const backgroundTimeoutId = setTimeout(() => {
+            generateBackgroundThumbnails();
+        }, 2000);
+
+        return () => clearTimeout(backgroundTimeoutId);
+    }, [pages, pageThumbnails, isLoading]);
     useEffect(() => {
         // Función para manejar beforeunload (antes de cerrar la ventana)
         const handleBeforeUnload = (event) => {
@@ -4368,6 +6858,203 @@ export default function EditorLibro() {
     // Renderiza cada página usando el mismo componente React con alta resolución
     const generateAlbumPDF = useCallback(async () => {
 
+        // try {
+        //     // Importar jsPDF dinámicamente
+        //     const { jsPDF } = await import('jspdf');
+
+        //     // 🖨️ DIMENSIONES PROFESIONALES: Con sangrado para impresión
+        //     let pageWidthCm = presetData?.width || 21; // A4 por defecto
+        //     let pageHeightCm = presetData?.height || 29.7;
+
+        //     // Agregar sangrado de 3mm (0.3cm) en cada lado para impresión profesional
+        //     const bleedCm = 0.3; // 3mm de sangrado estándar
+        //     const printWidthCm = pageWidthCm + (bleedCm * 2);
+        //     const printHeightCm = pageHeightCm + (bleedCm * 2);
+
+        //     // Convertir a puntos (1 cm = 28.35 puntos)
+        //     const pageWidthPt = printWidthCm * 28.35;
+        //     const pageHeightPt = printHeightCm * 28.35;
+
+
+
+        //     // 🖨️ PDF PROFESIONAL: Sin compresión para máxima calidad de impresión
+        //     const pdf = new jsPDF({
+        //         orientation: pageWidthPt > pageHeightPt ? 'landscape' : 'portrait',
+        //         unit: 'pt',
+        //         format: [pageWidthPt, pageHeightPt],
+        //         compress: false // Sin compresión para calidad profesional
+        //     });
+
+        //     // Mostrar progreso
+        //     const totalPages = pages.length;
+        //     let processedPages = 0;
+
+        //     // Crear elemento de progreso
+        //     const progressContainer = document.createElement('div');
+        //     progressContainer.id = 'pdf-progress';
+        //     progressContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        //     progressContainer.innerHTML = `
+        //         <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        //             <h3 class="text-lg font-semibold mb-4">Generando PDF de alta calidad...</h3>
+        //             <div class="w-full bg-gray-200 rounded-full h-2">
+        //                 <div id="pdf-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        //             </div>
+        //             <p class="text-sm text-gray-600 mt-2">
+        //                 <span id="current-page">0</span> de ${totalPages} páginas procesadas
+        //             </p>
+        //         </div>
+        //     `;
+        //     document.body.appendChild(progressContainer);
+
+        //     const updateProgress = (current) => {
+        //         const percentage = (current / totalPages) * 100;
+        //         document.getElementById('pdf-progress-bar').style.width = `${percentage}%`;
+        //         document.getElementById('current-page').textContent = current;
+        //     };
+
+        //     // 🖨️ GUARDAR PÁGINA ORIGINAL antes del loop
+        //     const originalCurrentPage = currentPage;
+
+        //     // Procesar cada página
+        //     for (let i = 0; i < pages.length; i++) {
+        //         const page = pages[i];
+
+        //         // Cambiar a la página actual temporalmente para capturarla
+        //         setCurrentPage(i);
+
+        //         // Esperar un momento para que se renderice
+        //         await new Promise(resolve => setTimeout(resolve, 500));
+
+        //         try {
+        //             // Capturar la página con alta calidad para PDF
+        //             const canvas = await captureCurrentWorkspace({ type: 'pdf' });
+
+        //             if (canvas) {
+        //                 // Calcular dimensiones para mantener aspecto y llenar la página
+        //                 const canvasAspect = canvas.width / canvas.height;
+        //                 const pageAspect = pageWidthPt / pageHeightPt;
+
+        //                 let imgWidth, imgHeight, offsetX = 0, offsetY = 0;
+
+        //                 if (canvasAspect > pageAspect) {
+        //                     // La imagen es más ancha, ajustar por ancho
+        //                     imgWidth = pageWidthPt;
+        //                     imgHeight = pageWidthPt / canvasAspect;
+        //                     offsetY = (pageHeightPt - imgHeight) / 2;
+        //                 } else {
+        //                     // La imagen es más alta, ajustar por alto
+        //                     imgHeight = pageHeightPt;
+        //                     imgWidth = pageHeightPt * canvasAspect;
+        //                     offsetX = (pageWidthPt - imgWidth) / 2;
+        //                 }
+
+        //                 // 🖨️ CALIDAD PROFESIONAL: PNG sin compresión para impresión
+        //                 const imgData = canvas.toDataURL('image/png', 1.0);
+        //                 console.log('th [7074]:', imgData)
+
+        //                 // Agregar página si no es la primera
+        //                 if (i > 0) {
+        //                     pdf.addPage([pageWidthPt, pageHeightPt]);
+        //                 }
+
+        //                 // 🖨️ Agregar imagen PNG de alta calidad al PDF
+        //                 pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+
+        //             } else {
+        //                 console.warn(`⚠️ No se pudo capturar la página ${i + 1}`);
+
+        //                 // Agregar página en blanco si falla la captura
+        //                 if (i > 0) {
+        //                     pdf.addPage([pageWidthPt, pageHeightPt]);
+        //                 }
+
+        //                 // Agregar texto de error
+        //                 pdf.setFontSize(12);
+        //                 pdf.text(`Error al renderizar página ${i + 1}`, pageWidthPt / 2, pageHeightPt / 2, { align: 'center' });
+        //             }
+        //         } catch (pageError) {
+        //             console.error(`❌ Error procesando página ${i + 1}:`, pageError);
+
+        //             // Agregar página de error
+        //             if (i > 0) {
+        //                 pdf.addPage([pageWidthPt, pageHeightPt]);
+        //             }
+
+        //             pdf.setFontSize(12);
+        //             pdf.text(`Error al procesar página ${i + 1}`, pageWidthPt / 2, pageHeightPt / 2, { align: 'center' });
+        //         }
+
+        //         processedPages++;
+        //         updateProgress(processedPages);
+
+        //         // Pausa pequeña entre páginas para no sobrecargar el navegador
+        //         await new Promise(resolve => setTimeout(resolve, 200));
+        //     }
+
+        //     // Restaurar página original
+        //     setCurrentPage(originalCurrentPage);
+
+        //     // Generar nombre del archivo
+        //     const fileName = `${itemData?.name || 'album'}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+        //     // Descargar el PDF
+        //     pdf.save(fileName);
+
+        //     // Remover progreso
+        //     document.body.removeChild(progressContainer);
+
+
+        //     // Mostrar mensaje de éxito
+        //     const successMsg = document.createElement('div');
+        //     successMsg.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg z-50';
+        //     successMsg.innerHTML = `
+        //         <div class="flex items-center">
+        //             <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        //                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+        //             </svg>
+        //             <span>PDF de alta calidad generado: ${fileName}</span>
+        //         </div>
+        //     `;
+        //     document.body.appendChild(successMsg);
+
+        //     setTimeout(() => {
+        //         if (document.body.contains(successMsg)) {
+        //             document.body.removeChild(successMsg);
+        //         }
+        //     }, 5000);
+
+        //     return fileName;
+
+        // } catch (error) {
+        //     console.error('❌ Error generando PDF:', error);
+
+        //     // Remover progreso si existe
+        //     const progressElement = document.getElementById('pdf-progress');
+        //     if (progressElement) {
+        //         document.body.removeChild(progressElement);
+        //     }
+
+        //     // Mostrar error
+        //     const errorMsg = document.createElement('div');
+        //     errorMsg.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg z-50';
+        //     errorMsg.innerHTML = `
+        //         <div class="flex items-center">
+        //             <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        //                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+        //             </svg>
+        //             <span>Error al generar PDF: ${error.message}</span>
+        //         </div>
+        //     `;
+        //     document.body.appendChild(errorMsg);
+
+        //     setTimeout(() => {
+        //         if (document.body.contains(errorMsg)) {
+        //             document.body.removeChild(errorMsg);
+        //         }
+        //     }, 7000);
+
+        //     throw error;
+        // }
 
         try {
             // Importar pdf-lib dinámicamente
@@ -4562,6 +7249,8 @@ export default function EditorLibro() {
 
     // Exponer funciones útiles globalmente para uso externo
     window.generateAlbumPDF = generateAlbumPDF;
+    window.generateHighQualityThumbnail = generateHighQualityThumbnail;
+    window.captureCurrentWorkspace = captureCurrentWorkspace;
 
     // 🎯 FUNCIONES DE TOUR EXPUESTAS GLOBALMENTE
     window.startEditorTour = startTour;
@@ -4580,158 +7269,160 @@ export default function EditorLibro() {
         };
     };
 
-    const createMirrorElement = useCallback((element, targetWidth) => {
-        if (!projectData?.canvas_preset) return null;
+    // 🚨 SOLUCIÓN DE EMERGENCIA: Función global para regenerar la miniatura actual con un clic
+    window.regenerateCurrentThumbnailNow = () => {
 
-        const aspect = projectData.canvas_preset.height / projectData.canvas_preset.width;
-        const scale = (targetWidth / workspaceDimensions.width).toFixed(2);
-        const targetHeight = Math.round(targetWidth * aspect);
+        // Limpiar caché para esta página
+        const pageId = pages[currentPage]?.id;
+        if (pageId) {
+            // Registrar para preservar filtros si existen
+            const pageData = pages[currentPage];
+            let hasFilters = false;
 
-        // Create container with target dimensions and overflow hidden
-        const container = document.createElement('div');
-        container.style.width = targetWidth + "px";
-        container.style.height = targetHeight + "px";
-        container.style.overflow = "hidden";
-        container.style.position = "relative";
+            if (pageData && pageData.cells) {
+                pageData.cells.forEach(cell => {
+                    if (cell.elements) {
+                        cell.elements.forEach(element => {
+                            if (element.filters &&
+                                (element.filters.brightness !== 100 ||
+                                    element.filters.contrast !== 100 ||
+                                    element.filters.saturation !== 100 ||
+                                    element.filters.tint !== 0 ||
+                                    element.filters.hue !== 0 ||
+                                    element.filters.blur > 0 ||
+                                    element.filters.opacity !== 100 ||
+                                    element.filters.scale !== 1 ||
+                                    element.filters.rotate !== 0 ||
+                                    element.filters.flipHorizontal ||
+                                    element.filters.flipVertical)) {
+                                hasFilters = true;
+                                element._hasRealFilters = true;
+                            }
+                        });
+                    }
+                });
+            }
 
-        // console.trace(JSON.stringify(rect, null, 2))
+            // Forzar aplicación de filtros si se detectan
+            if (hasFilters) {
+                window.PRESERVE_FILTERS_FOR_PAGE = pageId;
+                window.FORCE_FILTER_APPLICATION = true;
+            }
 
-        // Clonar el elemento
-        const mirror = element.cloneNode(true);
-        mirror.setAttribute('id', `th-${element.id}`)
-        mirror.classList.add("thumbnail");
-        mirror.style.width = workspaceDimensions.width + "px";
-        mirror.style.height = workspaceDimensions.height + "px";
-        mirror.style.transform = `scale(${scale})`;
-        mirror.style.transformOrigin = "top left";
-        mirror.style.position = "absolute";
-        mirror.style.pointerEvents = "none"; // que no sea editable
-
-        // Add mirror element to container
-        container.appendChild(mirror);
-
-        // console.log(structuredClone(rect), structuredClone(workspaceDimensions))
-
-        // Observador para mantenerlo sincronizado
-        const observer = new MutationObserver(() => {
-            const newClone = element.cloneNode(true);
-            newClone.style.width = workspaceDimensions.width + "px";
-            newClone.style.height = workspaceDimensions.height + "px";
-            mirror.replaceWith(newClone);
-            newClone.classList.add("thumbnail");
-            newClone.style.width = workspaceDimensions.width + "px";
-            newClone.style.height = workspaceDimensions.height + "px";
-            newClone.style.transform = `scale(${scale})`;
-            newClone.style.transformOrigin = "top left";
-            newClone.style.position = "absolute";
-            newClone.style.pointerEvents = "none";
-            mirrorRef.current = newClone;
-        });
-        observer.observe(element, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            characterData: true,
-        });
-
-        // truco para devolver referencia "viva"
-        const mirrorRef = { current: container };
-        return container;
-    }, [projectData?.canvas_preset, pages, workspaceDimensions])
-
-    const createMirrorImage = useCallback(async (element, targetWidth, outputType = "file", scale = 1) => {
-        if (!projectData?.canvas_preset) return null;
-
-        // Calcular factor de escala
-        const factor = targetWidth / workspaceDimensions.width;
-        const finalScale = factor * scale;
-
-        // Guardar estilos originales
-        const prevDisplay = element.style.display;
-        const prevVisibility = element.style.visibility;
-        const prevOverflow = element.style.overflow;
-
-        // Forzar visible
-        element.style.display = "block";
-        element.style.visibility = "visible";
-        element.style.overflow = "visible";
-
-        // Agregar clase temporal
-        element.classList.add("thumbnail");
-
-        let dataUrl;
-        try {
-            dataUrl = await htmlToImage.toPng(element, {
-                // width: workspaceDimensions.width * finalScale,
-                // height: workspaceDimensions.height * finalScale,
-                // canvasWidth: workspaceDimensions.width * finalScale,
-                // canvasHeight: workspaceDimensions.height * finalScale,
-                width: workspaceDimensions.width,
-                height: workspaceDimensions.height,
-                canvasWidth: workspaceDimensions.width,
-                canvasHeight: workspaceDimensions.height,
+            // Limpiar caché
+            setPageThumbnails(prev => {
+                const updated = { ...prev };
+                delete updated[pageId];
+                return updated;
             });
-        } finally {
-            // Restaurar estado original
-            element.style.display = prevDisplay;
-            element.style.visibility = prevVisibility;
-            element.style.overflow = prevOverflow;
-            element.classList.remove("thumbnail");
         }
 
-        if (outputType === "base64") {
-            return dataUrl; // data:image/png;base64,...
-        }
+        // Forzar regeneración inmediata
+        setTimeout(() => {
+            generateCurrentPageThumbnail(true);
 
-        if (outputType === "blob") {
-            const res = await fetch(dataUrl);
-            const blob = await res.blob();
-            return URL.createObjectURL(blob);
-        }
+            // Resetear flags después de un tiempo
+            setTimeout(() => {
+                window.PRESERVE_FILTERS_FOR_PAGE = null;
+            }, 1000);
+        }, 100);
 
-        if (outputType === "file") {
-            const res = await fetch(dataUrl);
-            const blob = await res.blob();
-            return new File([blob], "mirror.png", { type: "image/png" });
-        }
+        return '✅ Miniatura regenerada con éxito!';
+    };
 
-        throw new Error("outputType debe ser 'file', 'base64' o 'blob'");
-    }, [projectData?.canvas_preset, workspaceDimensions]);
+    // 🔥 NUEVA FUNCIÓN: Regenerar miniatura con filtros garantizados
+    window.generateThumbnailWithFilters = () => {
+        window.FORCE_FILTER_APPLICATION = true;
 
-    const [mirrors, setMirrors] = useState({})
-    const [mirrorsGenerated, setMirrorsGenerated] = useState(false)
+        // Añadir timestamp para evitar caché del navegador
+        const cacheBreaker = Date.now();
+        window._filterCacheBreaker = cacheBreaker;
 
-    useEffect(() => {
-        if (mirrorsGenerated) return
+        // Regenerar
+        window.regenerateCurrentThumbnailNow();
 
-        const hasAtLeastOne = pages.find(({ cells }) => cells.find(({ elements }) => elements.some(({ content }) => (content ?? '').trim())))
-        if (hasAtLeastOne) setMirrorsGenerated(true)
+        // Limpiar flag después de un tiempo
+        setTimeout(() => {
+            window.FORCE_FILTER_APPLICATION = false;
+        }, 1000);
 
-        pages.forEach(page => {
-            let pageElement = document.getElementById(`page-${page.id}`);
-            if (!pageElement) document.createElement('div', {
-                width: 300,
-                height: 200
-            });
+        return '✅ Miniatura con filtros regenerada exitosamente';
+    };
 
-            const mirror = createMirrorElement(pageElement, 268);
-            setMirrors(prev => ({
-                ...prev,
-                [page.id]: mirror.outerHTML
-            }));
+    // 🚀 FUNCIÓN RADICAL: Usar el sistema de filtros garantizados
+    window.forceRegenerateWithGuaranteedFilters = async () => {
 
-        });
-    }, [projectData, workspaceDimensions, pages, mirrorsGenerated]);
-
-    // Update mirror for current page when editing
-    useEffect(() => {
         const currentPageData = pages[currentPage];
-        if (!currentPageData) return;
+        if (!currentPageData || !workspaceDimensions) {
+            console.error('❌ [RADICAL] Datos no disponibles');
+            return false;
+        }
 
-        const main = document.getElementById(`page-${currentPageData.id}`);
-        const mirror = createMirrorElement(main, 268);
-        setMirrors(prev => ({ ...prev, [currentPageData.id]: mirror.outerHTML }));
-    }, [pages, currentPage]);
+        try {
+            // 🛑 IMPORTANTE: Limpiar verificaciones previas para evitar bucles
+            if (window._filterVerificationDone) {
+                window._filterVerificationDone.clear();
+            }
+
+            // Exponer datos para el sistema radical
+            window._currentPageData = currentPageData;
+            window._workspaceDimensions = workspaceDimensions;
+            window._updateThumbnailInUI = (id, thumbnail) => {
+                setPageThumbnails(prev => ({
+                    ...prev,
+                    [id]: thumbnail
+                }));
+            };
+
+
+
+            // Generar con sistema radical
+            const thumbnail = await generateThumbnailWithGuaranteedFilters(currentPageData, workspaceDimensions);
+
+            if (thumbnail) {
+                // 🛡️ PROTEGER THUMBNAIL GLOBAL CON FILTROS
+                const pageHasFilters = currentPageData.elements?.some(element => {
+                    if (!element.filters) return false;
+                    return Object.keys(element.filters).some(key =>
+                        key === 'flipHorizontal' || key === 'flipVertical' ? element.filters[key] :
+                            (key === 'brightness' || key === 'contrast' || key === 'saturation' || key === 'opacity' || key === 'scale') ? element.filters[key] !== 1 :
+                                (key === 'tint' || key === 'hue' || key === 'blur' || key === 'rotate') ? element.filters[key] !== 0 : false
+                    );
+                });
+
+                if (pageHasFilters) {
+                    window.protectThumbnail?.(currentPageData.id);
+                }
+
+                setPageThumbnails(prev => {
+                    return {
+                        ...prev,
+                        [currentPageData.id]: thumbnail
+                    };
+                });
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            console.error('❌ [RADICAL] Error:', error);
+            return false;
+        }
+    };
+
+    // 🎯 FUNCIÓN SEGURA: Regenerar thumbnail con protección anti-bucle
+    window.safeRegenerateThumbnail = () => {
+
+        // Limpiar verificaciones para permitir nueva verificación
+        if (window._filterVerificationDone) {
+            window._filterVerificationDone.clear();
+        }
+
+        // Regenerar de forma segura
+        generateCurrentPageThumbnail(true);
+
+        return '✅ Regeneración segura completada';
+    };
 
     return (
         <DndProvider backend={HTML5Backend} className="!h-screen !w-screen overflow-hidden">
@@ -5109,11 +7800,15 @@ export default function EditorLibro() {
                                     variant="secondary"
                                     size="sm"
                                     onClick={async (e) => {
+                                        // ⚡️ PREVENIR RECARGA: Evitar comportamiento por defecto
                                         e.preventDefault();
                                         e.stopPropagation();
 
                                         try {
-                                            // Show initial preparation modal
+
+                                            // 💾 NUEVA FASE 0: Guardar automáticamente antes de continuar
+
+                                            // Mostrar modal de preparación inicial
                                             setAlbumPreparationModal({
                                                 isOpen: true,
                                                 phase: 'saving',
@@ -5122,18 +7817,24 @@ export default function EditorLibro() {
                                                 subMessage: 'Asegurando que todo esté actualizado...'
                                             });
 
-                                            // Save current progress
+                                            // Ejecutar guardado manual
                                             try {
                                                 await saveProgressManually();
+
+                                                // Actualizar progreso del guardado
                                                 setAlbumPreparationModal(prev => ({
                                                     ...prev,
                                                     progress: 15,
                                                     message: '✅ Cambios guardados',
                                                     subMessage: 'Preparando vista previa...'
                                                 }));
+
+                                                // Pequeña pausa para mostrar el éxito
                                                 await new Promise(resolve => setTimeout(resolve, 500));
+
                                             } catch (saveError) {
                                                 console.error('❌ [AUTO-SAVE] Error al guardar:', saveError);
+                                                // Continuar de todas formas, pero mostrar advertencia
                                                 setAlbumPreparationModal(prev => ({
                                                     ...prev,
                                                     progress: 10,
@@ -5143,56 +7844,83 @@ export default function EditorLibro() {
                                                 await new Promise(resolve => setTimeout(resolve, 300));
                                             }
 
-                                            // Generate thumbnails for each page
-                                            const thumbnailPromises = [];
-                                            const pdfThumbnails = {};
+                                            // 🎭 FASE 1: Mostrar modal de preparación con tipo específico
+                                            setAlbumPreparationModal(prev => ({
+                                                ...prev,
+                                                phase: 'preparing',
+                                                progress: 15,
+                                                message: `${contentType.icon} Creando tu ${contentType.name.toLowerCase()}`,
+                                                subMessage: contentType.type === 'album'
+                                                    ? 'Preparando la experiencia completa de tu álbum...'
+                                                    : contentType.type === 'catalog'
+                                                        ? 'Organizando tu catálogo de contenido...'
+                                                        : contentType.type === 'booklet'
+                                                            ? 'Preparando tu folleto personalizado...'
+                                                            : 'Optimizando tu diseño único...'
+                                            }));
 
-                                            // Update modal to thumbnail generation phase
+                                            // 🎭 FASE 2: Simular preparación específica (15-30%)
+                                            const preparationSteps = contentType.type === 'album'
+                                                ? ['🔧 Encuadernando páginas', '📖 Ajustando tapas', '✨ Puliendo detalles']
+                                                : contentType.type === 'catalog'
+                                                    ? ['📑 Organizando contenido', '🎨 Optimizando diseño', '⚡ Finalizando catálogo']
+                                                    : contentType.type === 'booklet'
+                                                        ? ['📋 Preparando folleto', '🖼️ Ajustando formato', '✨ Aplicando estilo']
+                                                        : ['🎨 Procesando diseño', '⚡ Optimizando calidad', '✨ Finalizando vista'];
+
+                                            for (let i = 15; i <= 30; i += 3) {
+                                                await new Promise(resolve => setTimeout(resolve, contentType.type === 'card' ? 50 : 100));
+                                                const stepIndex = Math.floor(((i - 15) / 15) * preparationSteps.length);
+                                                setAlbumPreparationModal(prev => ({
+                                                    ...prev,
+                                                    progress: i,
+                                                    message: preparationSteps[Math.min(stepIndex, preparationSteps.length - 1)],
+                                                    subMessage: `Progreso: ${i}% - Optimizando para mejor experiencia...`
+                                                }));
+                                            }
+
+                                            // 🎭 FASE 3: Cargar thumbnails en background (30-80%)
                                             setAlbumPreparationModal(prev => ({
                                                 ...prev,
                                                 phase: 'processing',
-                                                progress: 30,
-                                                message: '📸 Generando miniaturas',
-                                                subMessage: 'Procesando páginas...'
+                                                message: `📷 Procesando ${contentType.name.toLowerCase()}`,
+                                                subMessage: 'Generando vistas de alta calidad...'
                                             }));
 
-                                            // Process each page
-                                            // Process thumbnails sequentially to avoid memory issues
-                                            let pageCounter = 0;
-                                            for (const page of pages) {
-                                                try {
-                                                    // Create mirror image and get blob URI
-                                                    const mainElement = document.getElementById(`page-${page.id}`)
-                                                    const thumbnail = await createMirrorImage(mainElement, 1000, 'blob');
-                                                    window.open(thumbnail, '_blank')
-                                                    pdfThumbnails[page.id] = thumbnail;
+                                            const pdfThumbnails = await loadExistingPDFThumbnails((loaded, total) => {
+                                                const loadProgress = 30 + (loaded / total) * 50; // 30% a 80%
+                                                setAlbumPreparationModal(prev => ({
+                                                    ...prev,
+                                                    progress: Math.round(loadProgress),
+                                                    subMessage: `Procesando imagen ${loaded} de ${total}...`
+                                                }));
+                                            });
 
-                                                    // Calculate and update progress
-                                                    const progress = 30 + Math.round((pageCounter + 1) / pages.length * 50);
-                                                    setAlbumPreparationModal(prev => ({
-                                                        ...prev,
-                                                        progress,
-                                                        subMessage: `Procesando página ${pageCounter + 1} de ${pages.length}...`
-                                                    }));
+                                            // 🎭 FASE 4: Finalizando específico por tipo (80-100%)
+                                            const finalizingMessages = {
+                                                album: { message: '📖 Encuadernando álbum', sub: 'Creando experiencia premium de lectura...' },
+                                                catalog: { message: '📑 Organizando catálogo', sub: 'Preparando navegación fluida...' },
+                                                booklet: { message: '📋 Finalizando folleto', sub: 'Ajustando formato profesional...' },
+                                                card: { message: '🎨 Puliendo diseño', sub: 'Aplicando toques finales...' }
+                                            };
 
-                                                    // Add small delay between pages to prevent UI freezing
-                                                    await new Promise(resolve => setTimeout(resolve, 100));
-                                                    pageCounter++;
-                                                } catch (error) {
-                                                    console.error(`Error processing page ${pageCounter}:`, error);
-                                                    // Continue with next page even if current fails
-                                                    continue;
-                                                }
+                                            const finalizing = finalizingMessages[contentType.type];
+                                            setAlbumPreparationModal(prev => ({
+                                                ...prev,
+                                                phase: 'finalizing',
+                                                message: finalizing.message,
+                                                subMessage: finalizing.sub
+                                            }));
+
+                                            for (let i = 80; i <= 100; i += 4) {
+                                                await new Promise(resolve => setTimeout(resolve, contentType.type === 'card' ? 40 : 80));
+                                                setAlbumPreparationModal(prev => ({
+                                                    ...prev,
+                                                    progress: i
+                                                }));
                                             }
 
-                                            // Ensure all thumbnails are properly processed
-                                            if (Object.keys(pdfThumbnails).length !== pages.length) {
-                                                console.warn('Some thumbnails failed to generate');
-                                            }
-
-                                            console.log(pdfThumbnails)
-
-                                            // Show completion message
+                                            // 🎉 FASE 5: ¡Listo! (100%) - Mensaje específico por tipo
                                             const readyMessages = {
                                                 album: { message: '📖 ¡Tu álbum está listo!', sub: 'Experiencia completa de lectura preparada' },
                                                 catalog: { message: '📑 ¡Tu catálogo está listo!', sub: 'Navegación profesional activada' },
@@ -5209,22 +7937,22 @@ export default function EditorLibro() {
                                                 subMessage: ready.sub
                                             }));
 
+                                            // Esperar un momento para que se vea el 100%
                                             await new Promise(resolve => setTimeout(resolve, 1000));
 
-                                            // Close preparation modal and update thumbnails
+                                            // 🎭 FASE 6: Cerrar modal de preparación y abrir vista
                                             setAlbumPreparationModal(prev => ({
                                                 ...prev,
                                                 isOpen: false
                                             }));
 
-                                            console.log(pdfThumbnails)
-
+                                            // Actualizar thumbnails y abrir modal correspondiente
                                             setPageThumbnails(prev => ({
                                                 ...prev,
                                                 ...pdfThumbnails
                                             }));
 
-                                            // Open preview modal
+                                            // Pequeño delay para transición suave
                                             setTimeout(() => {
                                                 setIsBookPreviewOpen(true);
                                             }, 300);
@@ -5232,6 +7960,7 @@ export default function EditorLibro() {
                                         } catch (error) {
                                             console.error(`❌ [${contentType.type.toUpperCase()}-EXPERIENCE] Error en experiencia:`, error);
 
+                                            // Mostrar error en el modal de preparación
                                             setAlbumPreparationModal(prev => ({
                                                 ...prev,
                                                 message: '⚠️ Ups, algo salió mal',
@@ -5239,6 +7968,7 @@ export default function EditorLibro() {
                                                 progress: 0
                                             }));
 
+                                            // Cerrar después de un momento
                                             setTimeout(() => {
                                                 setAlbumPreparationModal(prev => ({
                                                     ...prev,
@@ -5963,10 +8693,9 @@ export default function EditorLibro() {
                                                                 <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mr-1.5"></div>
                                                                 Cover
                                                             </div>
-                                                            {categorizedPages.cover.map((page, index) => {
-                                                                return <div
+                                                            {categorizedPages.cover.map((page, index) => (
+                                                                <div
                                                                     key={page.id}
-                                                                    id={`th-${page.id}`}
                                                                     className={`relative group flex flex-col cursor-pointer transition-all duration-200 transform 
                                                                     ${currentPage === pages.indexOf(page)
                                                                             ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
@@ -5974,10 +8703,27 @@ export default function EditorLibro() {
                                                                     mb-2`}
                                                                     onClick={() => handlePageChange(pages.indexOf(page))}
                                                                 >
-                                                                    <div className="relative bg-purple-50 overflow-hidden w-full h-auto" dangerouslySetInnerHTML={{ __html: mirrors[page.id] }} />
-                                                                    <span className="absolute top-0 left-0 right-0 bottom-0 bg-transparent z-10"></span>
+                                                                    <div className="relative bg-purple-50 overflow-hidden border aspect-[4/3] rounded-lg">
+                                                                        <ThumbnailImage
+                                                                            pageId={page.id}
+                                                                            thumbnail={optimizedThumbnails[page.id]}
+                                                                            altText="Cover"
+                                                                            type="cover"
+                                                                        />
+                                                                        {/* Indicador de cambios sin guardar */}
+                                                                        {(pageChanges instanceof Map && pageChanges.has && pageChanges.has(pages.indexOf(page))) && (
+                                                                            <div className="absolute top-1 right-1 bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full shadow-sm">
+                                                                                •
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6 group-hover:opacity-100 opacity-80 transition-opacity">
+                                                                            <span className="text-[10px] text-white font-medium block">
+                                                                                Cover
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                            })}
+                                                            ))}
                                                         </div>
                                                     )}
 
@@ -5988,8 +8734,8 @@ export default function EditorLibro() {
                                                             Content Pages
                                                         </div>
                                                         <div className="space-y-2">
-                                                            {categorizedPages.content.map((page, index) => {
-                                                                return <div
+                                                            {categorizedPages.content.map((page, index) => (
+                                                                <div
                                                                     key={page.id}
                                                                     className={`relative group flex flex-col cursor-pointer transition-all duration-200 transform 
                                                                     ${currentPage === pages.indexOf(page)
@@ -5998,11 +8744,29 @@ export default function EditorLibro() {
                                                                     mb-1`}
                                                                     onClick={() => handlePageChange(pages.indexOf(page))}
                                                                 >
-                                                                    <div className="relative bg-purple-50 overflow-hidden w-full h-auto" dangerouslySetInnerHTML={{ __html: mirrors[page.id] }} />
-                                                                    <div className="absolute top-1 left-1 bg-white/90 rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold shadow-md border">{index + 1}</div>
-                                                                    <span className="absolute top-0 left-0 right-0 bottom-0 bg-transparent z-10"></span>
+                                                                    <div className="relative overflow-hidden border aspect-[4/3] rounded-lg">
+                                                                        <ThumbnailImage
+                                                                            pageId={page.id}
+                                                                            thumbnail={optimizedThumbnails[page.id]}
+                                                                            altText={`Page ${page.pageNumber}`}
+                                                                            type="content"
+                                                                        />
+                                                                        <div className="absolute top-1 left-1 bg-white/90 rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold shadow-sm">
+                                                                            {page.pageNumber}
+                                                                        </div>
+                                                                        {/* Indicador de cambios sin guardar */}
+                                                                        {(pageChanges instanceof Map && pageChanges.has && pageChanges.has(pages.indexOf(page))) ? (
+                                                                            <div className="absolute top-1 right-1 bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full shadow-sm">
+                                                                                Sin guardar
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="absolute top-1 right-1 bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-full opacity-80 group-hover:opacity-100">
+                                                                                Editable
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            })}
+                                                            ))}
                                                         </div>
                                                     </div>
 
@@ -6013,8 +8777,8 @@ export default function EditorLibro() {
                                                                 <div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5"></div>
                                                                 Back Cover
                                                             </div>
-                                                            {categorizedPages.final.map((page, index) => {
-                                                                return <div
+                                                            {categorizedPages.final.map((page, index) => (
+                                                                <div
                                                                     key={page.id}
                                                                     className={`relative group flex flex-col cursor-pointer transition-all duration-200 transform 
                                                                     ${currentPage === pages.indexOf(page)
@@ -6023,10 +8787,27 @@ export default function EditorLibro() {
                                                                     mb-2`}
                                                                     onClick={() => handlePageChange(pages.indexOf(page))}
                                                                 >
-                                                                    <div className="relative bg-purple-50 overflow-hidden w-full h-auto" dangerouslySetInnerHTML={{ __html: mirrors[page.id] }} />
-                                                                    <span className="absolute top-0 left-0 right-0 bottom-0 bg-transparent z-10"></span>
+                                                                    <div className="relative overflow-hidden border mb-1 aspect-[4/3] rounded-lg">
+                                                                        <ThumbnailImage
+                                                                            pageId={page.id}
+                                                                            thumbnail={optimizedThumbnails[page.id]}
+                                                                            altText="Back Cover"
+                                                                            type="final"
+                                                                        />
+                                                                        {/* Indicador de cambios sin guardar */}
+                                                                        {(pageChanges instanceof Map && pageChanges.has && pageChanges.has(pages.indexOf(page))) && (
+                                                                            <div className="absolute top-1 right-1 bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full shadow-sm">
+                                                                                •
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6 group-hover:opacity-100 opacity-80 transition-opacity">
+                                                                            <span className="text-[10px] text-white font-medium block">
+                                                                                Back Cover
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                            })}
+                                                            ))}
                                                         </div>
                                                     )}
                                                 </div>
@@ -6117,6 +8898,19 @@ export default function EditorLibro() {
                                                                         selectedElement,
                                                                         { filters: newFilters }
                                                                     );
+
+                                                                    // 2. FORZAR regeneración inmediata con múltiples intentos
+                                                                    setTimeout(() => {
+                                                                        generateCurrentPageThumbnail(true);
+                                                                    }, 50);
+
+                                                                    setTimeout(() => {
+                                                                        generateCurrentPageThumbnail(true);
+                                                                    }, 200);
+
+                                                                    setTimeout(() => {
+                                                                        generateCurrentPageThumbnail(true);
+                                                                    }, 500);
                                                                 }}
                                                                 selectedElement={currentElement}
                                                             />
@@ -6258,142 +9052,149 @@ export default function EditorLibro() {
 
                             {/* Canvas workspace - centered */}
                             <div id="editor-workspace" className={`editor-workspace flex-1 relative flex items-center justify-center p-6 overflow-hidden bg-gray-100 ${previewMode ? 'preview-mode' : ''}`}>
-                                {pages.map((page, pageIndex) => {
-                                    // Get layout directly from layouts array
-                                    const layout = layouts.find(l => l.id === page.layout) || layouts[0];
-                                    const isComplexLayout = layout.cellStyles && Object.values(layout.cellStyles).some(style =>
-                                        style.includes('col-span-') || style.includes('row-span-')
-                                    );
-                                    const currentLayout = {
-                                        ...layout,
-                                        isComplex: isComplexLayout,
-                                        pageId: page.id
-                                    };
 
-                                    return (
-                                        <div key={page.id} hidden={currentPage !== pageIndex}>
-                                            {previewMode ? (
-                                                <div className="bg-white rounded-lg shadow-lg">
-                                                    <div
-                                                        className="overflow-hidden"
-                                                        style={{
-                                                            width: workspaceDimensions.width,
-                                                            height: workspaceDimensions.height,
-                                                        }}
-                                                    >
-                                                        <div
-                                                            id={`page-${page.id}`}
-                                                            className={`grid ${currentLayout.template} gap-6`}
-                                                            style={{ width: '100%', height: '100%' }}
-                                                        >
-                                                            {page.cells.map((cell, idx) => {
-                                                                const cellDimensions = calculateCellDimensions(currentLayout, idx, workspaceDimensions);
 
-                                                                return (
-                                                                    <EditableCell
-                                                                        key={cell.id}
-                                                                        id={cell.id}
-                                                                        elements={cell.elements.filter(el => !el.locked)}
-                                                                        workspaceSize={cellDimensions}
-                                                                        cellStyle={currentLayout.cellStyles?.[page.cells.indexOf(cell)]}
-                                                                        selectedElement={selectedCell === cell.id ? selectedElement : null}
-                                                                        onSelectElement={handleSelectElement}
-                                                                        onAddElement={(element, cellId) => addElementToCell(cellId, element)}
-                                                                        onUpdateElement={(elementId, updates, isDuplicate) =>
-                                                                            updateElementInCell(cell.id, elementId, updates, isDuplicate)}
-                                                                        onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
-                                                                        availableMasks={currentLayout.maskCategories.flatMap((cat) => cat.masks)}
-                                                                        projectData={projectData}
-                                                                    />
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div
-                                                    id={`page-${page.id}`}
-                                                    className="shadow-xl overflow-hidden"
-                                                    style={{
-                                                        width: workspaceDimensions.width,
-                                                        height: workspaceDimensions.height,
-                                                        position: 'relative',
-                                                        backgroundColor: page?.backgroundColor || '#ffffff',
-                                                        backgroundImage: page?.backgroundImage ? `url(${page.backgroundImage})` : 'none',
-                                                        backgroundSize: 'cover',
-                                                        backgroundPosition: 'center',
-                                                        backgroundRepeat: 'no-repeat'
-                                                    }}
-                                                >
-                                                    {/* Background layer */}
-                                                    {(() => {
-                                                        if (page?.backgroundImage) {
-                                                            return (
-                                                                <img
-                                                                    src={page.backgroundImage}
-                                                                    alt="background"
-                                                                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                                                                    style={{
-                                                                        zIndex: 1,
-                                                                    }}
-                                                                />
-                                                            );
-                                                        } else if (page?.backgroundColor) {
-                                                            return (
-                                                                <div
-                                                                    className="absolute inset-0 w-full h-full pointer-events-none"
-                                                                    style={{
-                                                                        backgroundColor: page.backgroundColor,
-                                                                        zIndex: 1,
-                                                                    }}
-                                                                />
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
+                                {previewMode ? (
+                                    <div className="bg-white rounded-lg shadow-lg">
+                                        <div
+                                            className="overflow-hidden"
+                                            style={{
+                                                width: workspaceDimensions.width,
+                                                height: workspaceDimensions.height,
+                                            }}
+                                        >
+                                            <div
+                                                id={`page-${pages[currentPage].id}`}
+                                                className={`grid ${getCurrentLayout().template} gap-6`}
+                                                style={{ width: '100%', height: '100%' }}
+                                            >
+                                                {pages[currentPage].cells.map((cell, idx) => {
+                                                    // 🔧 CORRECCIÓN LAYOUT: Calcular dimensiones reales de la celda
+                                                    const layout = getCurrentLayout();
+                                                    const cellDimensions = calculateCellDimensions(layout, idx, workspaceDimensions);
 
-                                                    {/* Editable cells layer */}
-                                                    <div
-                                                        className={`grid ${currentLayout.template}`}
-                                                        style={{
-                                                            position: 'relative',
-                                                            zIndex: 10,
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            boxSizing: 'border-box',
-                                                            gap: currentLayout.style?.gap || '16px',
-                                                            padding: currentLayout.style?.padding || '16px'
-                                                        }}
-                                                    >
-                                                        {page.cells.map((cell) => (
-                                                            <EditableCell
-                                                                key={cell.id}
-                                                                id={cell.id}
-                                                                elements={cell.elements.filter(el => !el.locked)}
-                                                                workspaceSize={workspaceDimensions}
-                                                                cellStyle={currentLayout.cellStyles?.[page.cells.indexOf(cell)]}
-                                                                selectedElement={selectedCell === cell.id ? selectedElement : null}
-                                                                onSelectElement={handleSelectElement}
-                                                                onAddElement={(element, cellId) => addElementToCell(cellId, element)}
-                                                                onUpdateElement={(elementId, updates, isDuplicate) =>
-                                                                    updateElementInCell(cell.id, elementId, updates, isDuplicate)}
-                                                                onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
-                                                                availableMasks={currentLayout.maskCategories.flatMap((cat) => cat.masks)}
-                                                                projectData={projectData}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
+                                                    return (
+                                                        <EditableCell
+                                                            key={cell.id}
+                                                            id={cell.id}
+                                                            elements={cell.elements.filter(el => !el.locked)}
+                                                            workspaceSize={cellDimensions} // 🎯 Usar dimensiones de celda, no workspace
+                                                            cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
+                                                            selectedElement={selectedCell === cell.id ? selectedElement : null}
+                                                            onSelectElement={handleSelectElement}
+                                                            onAddElement={(element, cellId) => addElementToCell(cellId, element)}
+                                                            onUpdateElement={(elementId, updates, isDuplicate) =>
+                                                                updateElementInCell(cell.id, elementId, updates, isDuplicate)}
+                                                            onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
+                                                            availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
+                                                            projectData={projectData}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                ) : (
+                                    <div
+                                        id={`page-${pages[currentPage].id}`}
+                                        className=" shadow-xl overflow-hidden"
+                                        style={{
+                                            width: workspaceDimensions.width,
+                                            height: workspaceDimensions.height,
+                                            position: 'relative',
+                                            backgroundColor: pages[currentPage]?.backgroundColor || '#ffffff',
+                                            backgroundImage: pages[currentPage]?.backgroundImage ? `url(${pages[currentPage].backgroundImage})` : 'none',
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                            backgroundRepeat: 'no-repeat'
+                                        }}
+                                    >
+
+
+                                        {/* Background layer */}
+                                        {(() => {
+                                            const page = pages[currentPage];
+
+                                            // Usar las propiedades backgroundImage y backgroundColor que ya están configuradas en la página
+                                            if (page?.backgroundImage) {
+                                                return (
+                                                    <img
+                                                        src={page.backgroundImage}
+                                                        alt="background"
+                                                        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                                                        style={{
+                                                            zIndex: 1,
+                                                        }}
+
+                                                    />
+                                                );
+                                            } else if (page?.backgroundColor) {
+                                                return (
+                                                    <div
+                                                        className="absolute inset-0 w-full h-full pointer-events-none"
+                                                        style={{
+                                                            backgroundColor: page.backgroundColor,
+                                                            zIndex: 1,
+                                                        }}
+                                                    />
+                                                );
+                                            }
+
+                                            return null;
+                                        })()}
+
+                                        {/* Editable cells layer */}
+                                        <div
+                                            className={`grid ${getCurrentLayout().template}`}
+                                            style={{
+                                                position: 'relative',
+                                                zIndex: 10,
+                                                width: '100%',
+                                                height: '100%',
+                                                boxSizing: 'border-box',
+                                                gap: getCurrentLayout().style?.gap || '16px',
+                                                padding: getCurrentLayout().style?.padding || '16px'
+                                            }}
+                                        >
+                                            {pages[currentPage].cells.map((cell) => (
+                                                <EditableCell
+                                                    key={cell.id}
+                                                    id={cell.id}
+                                                    elements={cell.elements.filter(el => !el.locked)}
+                                                    workspaceSize={workspaceDimensions}
+                                                    cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
+                                                    selectedElement={selectedCell === cell.id ? selectedElement : null}
+                                                    onSelectElement={handleSelectElement}
+                                                    onAddElement={(element, cellId) => addElementToCell(cellId, element)}
+                                                    onUpdateElement={(elementId, updates, isDuplicate) =>
+                                                        updateElementInCell(cell.id, elementId, updates, isDuplicate)}
+                                                    onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
+                                                    availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
+                                                    projectData={projectData}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </main>
                     </div>
                 </div>
             )}
+
+            {/* Toaster para notificaciones */}
             <Toaster />
+
+            {/* Modal de recuperación de progreso - DESHABILITADO: Carga automática */}
+            {/* 
+            <ProgressRecoveryModal
+                isOpen={showProgressRecovery}
+                onClose={() => setShowProgressRecovery(false)}
+                savedProgress={savedProgress}
+                onLoadProgress={handleLoadProgress}
+                onDiscardProgress={handleDiscardProgress}
+            />
+            */}
         </DndProvider>
     );
 }

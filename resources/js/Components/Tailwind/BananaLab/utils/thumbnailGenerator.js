@@ -953,7 +953,7 @@ export const clearThumbnailCaches = () => {
 };
 
 export const generateThumbnailWithGuaranteedFilters = async (pageId, layout, options = {}) => {
-    console.log(`🎨 [STUB] generateThumbnailWithGuaranteedFilters llamada para página ${pageId}`);
+    // console.log(`🎨 [STUB] generateThumbnailWithGuaranteedFilters llamada para página ${pageId}`);
     return generatePageThumbnail(pageId, layout, { ...options, type: 'high_quality' });
 };
 

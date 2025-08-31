@@ -378,10 +378,11 @@ export default function TextElement({
                 <>
                     {/* Indicador de drag en la esquina superior izquierda */}
                     <div 
+                    data-editor
                         className="absolute top-0 left-0 transform translate-x-[-100%] translate-y-[-100%] bg-white rounded-md p-1 shadow-sm border"
                         style={{ zIndex: 9999 }} // Controles siempre encima
                     >
-                        <Move className="h-3 w-3 text-gray-500" />
+                        <Move className="h-3 w-3 text-gray-500"/>
                     </div>
                     
                     {/* Toolbar en la esquina superior derecha */}

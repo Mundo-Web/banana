@@ -63,7 +63,7 @@ export default function EditableCell({
         // Calculate maximum preset size in pixels
         const { height, width, dpi } = projectData.canvas_preset;
         const maxSizeMm = Math.max(height, width);
-        const maxSizePx = Math.round((maxSizeMm * dpi) / 25.4);
+        const maxSizePx = Math.round((maxSizeMm * dpi) / 50.8);
 
         // Function to resize image if needed
         const resizeImageIfNeeded = async (file) => {
@@ -71,7 +71,7 @@ export default function EditableCell({
                 const img = new Image();
                 img.onload = () => {
                     const maxImageDimension = Math.max(img.width, img.height);
-                    
+
                     // If image is smaller than maxSizePx, return original file
                     if (maxImageDimension <= maxSizePx) {
                         URL.revokeObjectURL(img.src);
@@ -88,11 +88,11 @@ export default function EditableCell({
                     const canvas = document.createElement('canvas');
                     canvas.width = newWidth;
                     canvas.height = newHeight;
-                    
+
                     // Draw and resize image
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, newWidth, newHeight);
-                    
+
                     // Convert to blob
                     canvas.toBlob((blob) => {
                         URL.revokeObjectURL(img.src);
@@ -321,33 +321,8 @@ export default function EditableCell({
         input.click();
     };
 
-    // Definir las clases de tamaño (mantenidas para compatibilidad)
-    const sizeClasses = {
-        square: "aspect-square", // 1:1
-        landscape: "aspect-video", // 16:9
-        portrait: "aspect-[3/4]", // 3:4
-        wide: "aspect-[2/1]", // 2:1
-        tall: "aspect-[9/16]", // 9:16
-        custom: "h-[500px]", // tamaño personalizado
-        auto: "w-full h-full", // Ocupa todo el espacio disponible en el grid
-    };
-
     // Determinar si la celda tiene contenido para aplicar el border correcto
     const hasContent = elements.length > 0;
-
-    // 📊 FUNCIÓN PARA MOSTRAR INFORMACIÓN DE ARCHIVO EN HOVER
-    const showFileInfo = () => {
-        const info = `
-📁 Límites de archivo:
-• Tamaño máximo: ${IMAGE_VALIDATION.maxSizeMB}MB
-• Tipos permitidos: ${IMAGE_VALIDATION.allowedTypes.join(', ')}
-
-⚠️ Las imágenes que excedan estos límites serán rechazadas.
-        `.trim();
-
-        console.log(info);
-        return info;
-    };
 
     return (
         <div
@@ -369,8 +344,9 @@ export default function EditableCell({
                 minHeight: "120px", // Altura mínima para celdas muy pequeñas
             }}
         >
-            {elements.length === 0 ? (
+            {elements.length === 0 ? (<>
                 <div
+                data-upload
                     className="absolute group inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
                     onClick={(e) => {
                         e.stopPropagation();
@@ -396,6 +372,7 @@ export default function EditableCell({
                         </div>
                     )}
                 </div>
+            </>
             ) : (
                 elements.map((element) => (
                     <div
