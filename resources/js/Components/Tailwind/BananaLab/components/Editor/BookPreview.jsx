@@ -6,6 +6,8 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import Global from "../../../../../Utils/Global";
 import { layouts } from '../../constants/layouts';
+// Import pdf-lib dynamically
+import * as PDFLib from 'pdf-lib';
 
 // Estilos para el modal
 const customStyles = {
@@ -339,26 +341,16 @@ const BookPreviewModal = ({
 
             console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
 
-            // Usar jsPDF ya importado al inicio del archivo
-            console.log('📦 [FRONTEND-PDF] Verificando jsPDF:', typeof jsPDF);
+            // Configure PDF dimensions
+            const pdfWidthPoints = (workspaceDimensions.originalWidth || 210) * 2.83465; // Convert mm to points
+            const pdfHeightPoints = (workspaceDimensions.originalHeight || 297) * 2.83465;
 
-            // Configurar dimensiones del PDF (usar las del workspace)
-            const pdfWidthMm4 = workspaceDimensions.originalWidth || 210;
-            const pdfHeightMm4 = workspaceDimensions.originalHeight || 297;
+            console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthPoints + 'pts x ' + pdfHeightPoints + 'pts');
 
-            // Configurar dimensiones del PDF (usar las del workspace)
-            const pdfWidthMm = pdfWidthMm4 / 6;
-            const pdfHeightMm = pdfHeightMm4 / 6;
-            console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthMm + 'mm x ' + pdfHeightMm + 'mm');
+            // Create PDF document
+            const pdfDoc = await PDFLib.PDFDocument.create();
 
-            // Crear PDF
-            const pdf = new jsPDF({
-                orientation: pdfWidthMm > pdfHeightMm ? 'landscape' : 'portrait',
-                unit: 'mm',
-                format: [pdfWidthMm, pdfHeightMm]
-            });
-
-            // Obtener páginas ordenadas
+            // Get ordered pages
             const bookPages = createBookPages();
             let pageCount = 0;
 
@@ -367,18 +359,61 @@ const BookPreviewModal = ({
 
                 if (imageUrl) {
                     try {
-                        // Si es la primera página, no agregar nueva página
-                        if (pageCount > 0) {
-                            pdf.addPage([pdfWidthMm, pdfHeightMm]);
+                        let imageBytes;
+
+                        // Handle blob URL vs base64 data URL
+                        if (imageUrl.startsWith('blob:')) {
+                            // For blob URLs, first convert to base64
+                            const response = await fetch(imageUrl);
+                            const blob = await response.blob();
+
+                            // Convert blob to base64
+                            const base64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.readAsDataURL(blob);
+                            });
+
+                            // Convert base64 to bytes
+                            const base64Data = base64.split(',')[1];
+                            imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+                        } else {
+                            // For regular URLs or base64
+                            const response = await fetch(imageUrl);
+                            const blob = await response.blob();
+                            const arrayBuffer = await blob.arrayBuffer();
+                            imageBytes = new Uint8Array(arrayBuffer);
                         }
 
-                        // Agregar imagen a la página
-                        pdf.addImage(imageUrl, 'JPEG', 0, 0, pdfWidthMm, pdfHeightMm);
-                        pageCount++;
+                        // Create new page
+                        const pdfPage = pdfDoc.addPage([pdfWidthPoints, pdfHeightPoints]);
 
-                        console.log(`📄 [FRONTEND-PDF] Página ${pageCount} agregada al PDF`);
+                        // Try PNG first, fallback to JPG
+                        let image;
+                        try {
+                            image = await pdfDoc.embedPng(imageBytes);
+                        } catch (pngError) {
+                            try {
+                                image = await pdfDoc.embedJpg(imageBytes);
+                            } catch (jpgError) {
+                                throw new Error('Failed to embed image as PNG or JPG');
+                            }
+                        }
+
+                        // Draw image on page
+                        pdfPage.drawImage(image, {
+                            x: 0,
+                            y: 0,
+                            width: pdfWidthPoints,
+                            height: pdfHeightPoints,
+                        });
+
+                        pageCount++;
+                        console.log(`📄 [FRONTEND-PDF] Page ${pageCount} added to PDF`);
+
                     } catch (imageError) {
-                        console.warn(`⚠️ [FRONTEND-PDF] Error agregando página ${pageCount + 1}:`, imageError);
+                        console.warn(`⚠️ [FRONTEND-PDF] Error adding page ${pageCount + 1}:`, imageError);
+                        console.warn('Image URL type:', imageUrl.substring(0, 50) + '...');
                     }
                 }
             }
@@ -388,11 +423,14 @@ const BookPreviewModal = ({
                 return false;
             }
 
-            // Generar PDF como blob
-            const pdfBlob = pdf.output('blob');
+            // Generate PDF bytes
+            const pdfBytes = await pdfDoc.save();
+
+            // Convert to Blob
+            const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
             console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
 
-            // Subir PDF al servidor
+            // Upload PDF to server
             console.log('🚀 [FRONTEND-PDF] Iniciando subida al servidor...');
             const uploadResult = await uploadPDFToServer(pdfBlob);
             console.log('🏁 [FRONTEND-PDF] Resultado de subida:', uploadResult);
@@ -871,11 +909,11 @@ const BookPreviewModal = ({
                                     }}
                                 >
                                     {/* Página individual */}
-                                    <div className={`border-2 ${pageIdx % 2? 'rounded-l-xl': 'rounded-r-xl'} overflow-hidden`} style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
+                                    <div className={`border-2 ${pageIdx % 2 ? 'rounded-l-xl' : 'rounded-r-xl'} overflow-hidden`} style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
                                         justifyContent: 'center',
                                     }}>
                                         {page.isBlankPage ? (
