@@ -78,8 +78,6 @@ const BookPreviewModal = ({
     albumLoadingState = { isLoading: false, loadedImages: 0, totalImages: 0, message: '' }
 }) => {
 
-    console.log('[Page THS]',pageThumbnails)
-
     const [currentPage, setCurrentPage] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -663,8 +661,6 @@ const BookPreviewModal = ({
     const contentOnlyMode = bookPages.length > 0 && !hasRealCover &&
         !bookPages.some(p => p.pageType === 'final');
 
-    console.log('Book pages:', bookPages)
-
     // Si no hay páginas, mostrar mensaje
     if (bookPages.length === 0) {
         return (
@@ -699,8 +695,6 @@ const BookPreviewModal = ({
             </Modal>
         );
     }
-
-    console.log('[THS]:',activeThumbnails);
 
     return (
         <Modal

@@ -4639,12 +4639,8 @@ export default function EditorLibro() {
         return container;
     }, [projectData?.canvas_preset, pages, workspaceDimensions])
 
-    const createMirrorImage = useCallback(async (element, targetWidth, outputType = "file", scale = 1) => {
+    const createMirrorImage = useCallback(async (element, targetWidth, outputType = "file", scale = 1.5) => {
         if (!projectData?.canvas_preset) return null;
-
-        // Calcular factor de escala
-        const factor = targetWidth / workspaceDimensions.width;
-        const finalScale = factor * scale;
 
         // Guardar estilos originales
         const prevDisplay = element.style.display;
@@ -4656,27 +4652,39 @@ export default function EditorLibro() {
         element.style.visibility = "visible";
         element.style.overflow = "visible";
 
-        // Agregar clase temporal
-        element.classList.add("thumbnail");
+        // Create temporary wrapper with thumbnail class
+        const wrapper = document.createElement("div");
+        wrapper.classList.add('thumbnail');
+        wrapper.style.transform = `scale(${scale})`;
+        wrapper.style.transformOrigin = "top left"; // important
+        wrapper.style.width = `${workspaceDimensions.width}px`;
+        wrapper.style.height = `${workspaceDimensions.height}px`;
+        wrapper.style.display = "inline-block";
+
+        // Clonar el elemento dentro del wrapper
+        const clone = element.cloneNode(true);
+        wrapper.appendChild(clone);
+
+        document.body.style.overflow = 'hidden';
+        document.body.appendChild(wrapper);
 
         let dataUrl;
         try {
-            dataUrl = await htmlToImage.toPng(element, {
-                // width: workspaceDimensions.width * finalScale,
-                // height: workspaceDimensions.height * finalScale,
-                // canvasWidth: workspaceDimensions.width * finalScale,
-                // canvasHeight: workspaceDimensions.height * finalScale,
-                width: workspaceDimensions.width,
-                height: workspaceDimensions.height,
-                canvasWidth: workspaceDimensions.width,
-                canvasHeight: workspaceDimensions.height,
+            dataUrl = await htmlToImage.toPng(wrapper, {
+                width: workspaceDimensions.width * scale,
+                height: workspaceDimensions.height * scale,
+                canvasWidth: workspaceDimensions.width * scale,
+                canvasHeight: workspaceDimensions.height * scale,
             });
         } finally {
             // Restaurar estado original
             element.style.display = prevDisplay;
             element.style.visibility = prevVisibility;
             element.style.overflow = prevOverflow;
-            element.classList.remove("thumbnail");
+
+            document.body.removeChild(wrapper);
+            document.body.style.overflow = 'auto';
+
         }
 
         if (outputType === "base64") {
@@ -5344,7 +5352,7 @@ export default function EditorLibro() {
                                     <span className="text-xs font-medium">Textos</span>
                                 </button>
 
-                                {/*  <button
+                                <button
                                     data-tab="filters"
                                     onClick={() => setActiveTab('filters')}
                                     className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all w-16 h-16 ${activeTab === 'filters'
@@ -5354,7 +5362,7 @@ export default function EditorLibro() {
                                 >
                                     <Filter className="h-6 w-6" />
                                     <span className="text-xs font-medium">Filtros</span>
-                                </button> */}
+                                </button>
 
                             </div>
 
