@@ -2716,7 +2716,7 @@ export default function EditorLibro() {
             const finalDataSizeMB = finalDataSize / (1024 * 1024);
 
 
-
+            // AQUI AGRWEGAR
             // 🚀 Enviar datos optimizados (sin verificación de tamaño extrema ya que están optimizados)
             const response = await fetch(`/api/canvas/projects/${projectData.id}/save-progress`, {
                 method: 'POST',
@@ -4739,6 +4739,14 @@ export default function EditorLibro() {
         const main = document.getElementById(`page-${currentPageData.id}`);
         const mirror = createMirrorElement(main, 268);
         setMirrors(prev => ({ ...prev, [currentPageData.id]: mirror.outerHTML }));
+
+        
+
+        const interval = setTimeout(() => {
+            saveProgressManually()
+        }, 3000);
+
+        return () => clearTimeout(interval)
     }, [pages, currentPage]);
 
     return (
