@@ -32,7 +32,6 @@ class CleanupOldAutoSaves extends Command
      */
     public function handle()
     {
-        return;
         $days = $this->option('days');
         $dryRun = $this->option('dry-run');
         $cutoffDate = Carbon::now()->subDays($days);
