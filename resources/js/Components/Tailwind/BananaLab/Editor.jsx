@@ -523,7 +523,7 @@ export default function EditorLibro() {
                 setPresetData(data.canvasPreset);
                 setInitialProject(data.initialProject);
 
-                handleLoadProgress(data.project);
+                setPages(data.project.design_data.pages);
 
                 setIsLoading(false);
 
