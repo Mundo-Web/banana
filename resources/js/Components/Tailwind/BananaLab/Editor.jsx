@@ -517,9 +517,6 @@ export default function EditorLibro() {
                 const data = await response.json();
 
 
-                await checkAndLoadSavedProgress();
-
-
                 // Establecer los datos en el estado
                 setProjectData(data.project);
                 setItemData(data.item);
@@ -3129,9 +3126,9 @@ export default function EditorLibro() {
         if (projectData?.id && !isLoading && pages.length === 0 && !hasInitializedProgress) {
             setHasInitializedProgress(true);
             // Añadir un pequeño delay para asegurar que el componente esté completamente montado
-            // setTimeout(() => {
-                // checkAndLoadSavedProgress();
-            // }, 500);
+            setTimeout(() => {
+                checkAndLoadSavedProgress();
+            }, 500);
         }
     }, [projectData?.id, isLoading, pages.length, checkAndLoadSavedProgress, hasInitializedProgress]);
 
