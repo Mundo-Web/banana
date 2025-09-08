@@ -2578,7 +2578,7 @@ export default function EditorLibro() {
                                     const imageType = matches[1];
                                     const imageData = matches[2];
                                     const extension = imageType === 'jpeg' ? 'jpg' : imageType;
-                                    const finalFilename = `${imageId}.${extension}`;
+                                    const finalFilename = `${imageId}.png`;
 
                                     // Agregar a la lista de imágenes para subir
                                     imagesToUpload.push({
