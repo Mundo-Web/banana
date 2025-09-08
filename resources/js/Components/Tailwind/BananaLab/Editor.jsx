@@ -960,7 +960,7 @@ export default function EditorLibro() {
             const imagesToPreload = projectImages.slice(0, 10);
             imagesToPreload.forEach((image, index) => {
                 setTimeout(() => {
-                    preloadImageCache(image.url);
+                    preloadImageCache(`/storage/${image.path}`);
                 }, index * 100); // Stagger la carga
             });
         }
