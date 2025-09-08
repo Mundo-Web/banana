@@ -11,6 +11,7 @@ export const uploadImageToBackend = async (base64Data, elementId, projectId) => 
         // Extraer tipo de imagen y datos
         const [header, data] = base64Data.split(',');
         const mimeType = header.match(/data:image\/(\w+)/)?.[1] || 'png';
+
         
         const formData = new FormData();
         
@@ -81,6 +82,7 @@ export const processImagesForSave = async (pages, projectId) => {
             
             for (const element of cell.elements || []) {
                 const processedElement = { ...element };
+                
                 
                 if (element.type === 'image' && element.content?.startsWith('data:image/')) {
                     try {
