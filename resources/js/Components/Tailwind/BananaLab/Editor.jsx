@@ -960,7 +960,7 @@ export default function EditorLibro() {
             const imagesToPreload = projectImages.slice(0, 10);
             imagesToPreload.forEach((image, index) => {
                 setTimeout(() => {
-                    preloadImageCache(`/storage/${image.path}`);
+                    preloadImageCache(image.url);
                 }, index * 100); // Stagger la carga
             });
         }
@@ -2284,7 +2284,7 @@ export default function EditorLibro() {
 
         const { height, width, dpi } = projectData.canvas_preset;
         const maxSizeMm = Math.max(height, width);
-        const maxSizePx = Math.round((maxSizeMm * dpi) / 12.7);
+        const maxSizePx = Math.round((maxSizeMm * dpi) / 25.4);
 
         // Function to resize image if needed
         const resizeImageIfNeeded = async (file) => {

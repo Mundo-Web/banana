@@ -217,12 +217,12 @@ class ProjectImageController extends Controller
                 $thumbnailUrl = null;
                 if (Storage::exists($thumbnailFullPath)) {
                     $encodedThumbnailPath = base64_encode($thumbnailFullPath);
-                    $thumbnailUrl = "/storage/{$thumbnailPath}/{$thumbnailFilename}";
+                    $thumbnailUrl = "/storage/{$thumbnailPath}/{$thumbnailFilename}.jpg";
                 }
                 
                 // Generar URL para la imagen principal
                 $encodedPath = base64_encode($file);
-                $imageUrl = "/storage/{$projectPath}/{$pathInfo['filename']}";
+                $imageUrl = "/storage/{$projectPath}/{$pathInfo['filename']}.jpg";
     
                 $images[] = [
                     'id' => pathinfo($filename, PATHINFO_FILENAME), // ID único basado en el nombre
