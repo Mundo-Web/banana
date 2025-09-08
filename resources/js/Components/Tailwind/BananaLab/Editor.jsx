@@ -523,8 +523,6 @@ export default function EditorLibro() {
                 setPresetData(data.canvasPreset);
                 setInitialProject(data.initialProject);
 
-                setPages(data.project.design_data.pages);
-
                 setIsLoading(false);
 
             } catch (error) {
@@ -2578,7 +2576,7 @@ export default function EditorLibro() {
                                     const imageType = matches[1];
                                     const imageData = matches[2];
                                     const extension = imageType === 'jpeg' ? 'jpg' : imageType;
-                                    const finalFilename = `${imageId}.png`;
+                                    const finalFilename = `${imageId}.${extension}`;
 
                                     // Agregar a la lista de imágenes para subir
                                     imagesToUpload.push({
@@ -3013,10 +3011,7 @@ export default function EditorLibro() {
         }
 
         try {
-            // 1. Verificar localStorage primero
-            const localProgress = autoSave.loadFromLocalStorage();
-
-            // 2. Verificar base de datos
+            // Load progress from server
             const response = await fetch(`/api/canvas/projects/${projectData.id}/load-progress`, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -3033,36 +3028,18 @@ export default function EditorLibro() {
                 }
             }
 
-            // Determinar qué progreso usar (el más reciente)
-            let progressToUse = null;
+            // Use server progress if available
+            if (serverProgress && 
+                (serverProgress.design_data?.pages?.length > 0)) {
 
-            if (localProgress && serverProgress) {
-                const localTime = new Date(localProgress.savedAt).getTime();
-                const serverTime = new Date(serverProgress.saved_at).getTime();
-                progressToUse = localTime > serverTime ? localProgress : serverProgress;
-            } else if (localProgress) {
-                progressToUse = localProgress;
-            } else if (serverProgress) {
-                progressToUse = serverProgress;
-            }
-
-            // 🚀 CARGA AUTOMÁTICA: Cargar automáticamente el progreso más reciente sin modal
-            if (progressToUse &&
-                (progressToUse.pages?.length > 0 || progressToUse.design_data?.pages?.length > 0)) {
-
-                // Verificar si el progreso es realmente más nuevo que el workspace actual
-                const progressTime = new Date(progressToUse.savedAt || progressToUse.saved_at).getTime();
+                // Check if progress is from last 30 minutes
+                const progressTime = new Date(serverProgress.saved_at).getTime();
                 const now = Date.now();
                 const timeDiff = now - progressTime;
 
-                // Solo cargar si el progreso es de los últimos 30 minutos
                 if (timeDiff < 30 * 60 * 1000) {
-                    //console.log('🔄 [AUTO-RECOVERY] Cargando automáticamente el progreso más reciente');
-                    toast.info('🔄 Cargando progreso guardado automáticamente...');
-                    // Cargar automáticamente sin mostrar modal
-                    handleLoadProgress(progressToUse);
-                } else {
-                    //console.log('📅 [RECOVERY] Progreso muy antiguo, ignorando automáticamente');
+                    toast.info('🔄 Loading auto-saved progress...');
+                    handleLoadProgress(serverProgress);
                 }
             }
 
