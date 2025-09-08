@@ -3129,7 +3129,7 @@ export default function EditorLibro() {
             setHasInitializedProgress(true);
             // Añadir un pequeño delay para asegurar que el componente esté completamente montado
             // setTimeout(() => {
-            //     checkAndLoadSavedProgress();
+                checkAndLoadSavedProgress();
             // }, 500);
         }
     }, [projectData?.id, isLoading, pages.length, checkAndLoadSavedProgress, hasInitializedProgress]);
@@ -4733,6 +4733,9 @@ export default function EditorLibro() {
         });
     }, [projectData, workspaceDimensions, pages, mirrorsGenerated]);
 
+    // State to track first save
+    const [isFirstSave, setIsFirstSave] = useState(true);
+
     // Update mirror for current page when editing
     useEffect(() => {
         const currentPageData = pages[currentPage];
@@ -4742,14 +4745,18 @@ export default function EditorLibro() {
         const mirror = createMirrorElement(main, 268);
         setMirrors(prev => ({ ...prev, [currentPageData.id]: mirror.outerHTML }));
 
-        
-
         const interval = setTimeout(() => {
-            saveProgressManually()
+            if (isFirstSave) {
+                // Skip first save and update flag
+                setIsFirstSave(false);
+            } else {
+                // Save on subsequent changes
+                saveProgressManually();
+            }
         }, 3000);
 
         return () => clearTimeout(interval)
-    }, [pages, currentPage]);
+    }, [pages, currentPage, isFirstSave]);
 
     return (
         <DndProvider backend={HTML5Backend} className="!h-screen !w-screen overflow-hidden">
