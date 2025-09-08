@@ -63,7 +63,7 @@ export default function EditableCell({
         // Calculate maximum preset size in pixels
         const { height, width, dpi } = projectData.canvas_preset;
         const maxSizeMm = Math.max(height, width);
-        const maxSizePx = Math.round((maxSizeMm * dpi) / 50.8);
+        const maxSizePx = Math.round((maxSizeMm * dpi) / 12.7);
 
         // Function to resize image if needed
         const resizeImageIfNeeded = async (file) => {

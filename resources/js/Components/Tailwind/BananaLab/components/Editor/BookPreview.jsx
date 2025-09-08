@@ -341,12 +341,6 @@ const BookPreviewModal = ({
 
             console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
 
-            // Configure PDF dimensions
-            const pdfWidthPoints = (workspaceDimensions.originalWidth || 210) * 2.83465; // Convert mm to points
-            const pdfHeightPoints = (workspaceDimensions.originalHeight || 297) * 2.83465;
-
-            console.log('📐 [FRONTEND-PDF] Dimensiones PDF:', pdfWidthPoints + 'pts x ' + pdfHeightPoints + 'pts');
-
             // Create PDF document
             const pdfDoc = await PDFLib.PDFDocument.create();
 
@@ -385,9 +379,6 @@ const BookPreviewModal = ({
                             imageBytes = new Uint8Array(arrayBuffer);
                         }
 
-                        // Create new page
-                        const pdfPage = pdfDoc.addPage([pdfWidthPoints, pdfHeightPoints]);
-
                         // Try PNG first, fallback to JPG
                         let image;
                         try {
@@ -400,16 +391,19 @@ const BookPreviewModal = ({
                             }
                         }
 
-                        // Draw image on page
+                        // Create new page with image dimensions
+                        const pdfPage = pdfDoc.addPage([image.width, image.height]);
+
+                        // Draw image on page using original dimensions
                         pdfPage.drawImage(image, {
                             x: 0,
                             y: 0,
-                            width: pdfWidthPoints,
-                            height: pdfHeightPoints,
+                            width: image.width,
+                            height: image.height
                         });
 
                         pageCount++;
-                        console.log(`📄 [FRONTEND-PDF] Page ${pageCount} added to PDF`);
+                        console.log(`📄 [FRONTEND-PDF] Page ${pageCount} added to PDF with dimensions ${image.width}x${image.height}`);
 
                     } catch (imageError) {
                         console.warn(`⚠️ [FRONTEND-PDF] Error adding page ${pageCount + 1}:`, imageError);
