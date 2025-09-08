@@ -517,6 +517,7 @@ export default function EditorLibro() {
                 const data = await response.json();
 
 
+                await checkAndLoadSavedProgress();
 
 
                 // Establecer los datos en el estado
@@ -3129,7 +3130,7 @@ export default function EditorLibro() {
             setHasInitializedProgress(true);
             // Añadir un pequeño delay para asegurar que el componente esté completamente montado
             // setTimeout(() => {
-                checkAndLoadSavedProgress();
+                // checkAndLoadSavedProgress();
             // }, 500);
         }
     }, [projectData?.id, isLoading, pages.length, checkAndLoadSavedProgress, hasInitializedProgress]);
