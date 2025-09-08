@@ -4665,6 +4665,8 @@ export default function EditorLibro() {
         const clone = element.cloneNode(true);
         wrapper.appendChild(clone);
 
+        console.log(`Width: ${workspaceDimensions.width}\nHeight: workspaceDimensions.height`)
+
         document.body.style.overflow = 'hidden';
         document.body.appendChild(wrapper);
 
