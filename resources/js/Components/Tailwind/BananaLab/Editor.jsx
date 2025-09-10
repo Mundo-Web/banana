@@ -4617,7 +4617,7 @@ export default function EditorLibro() {
         return container;
     }, [projectData?.canvas_preset, pages, workspaceDimensions])
 
-    const createMirrorImage = useCallback(async (element, targetWidth, outputType = "file", scale = 4) => {
+    const createMirrorImage = useCallback(async (element, targetWidth, outputType = "file", scale = 3) => {
         if (!projectData?.canvas_preset) return null;
 
         // Guardar estilos originales
