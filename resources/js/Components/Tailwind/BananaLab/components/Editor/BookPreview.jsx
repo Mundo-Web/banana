@@ -505,7 +505,7 @@ const BookPreviewModal = ({
 
                 console.log(`📤 [UPLOAD-PDF] Uploading chunk ${i + 1}/${totalChunks}`);
 
-                const response = await fetch(`/api/customer/projects/${projectData.id}/upload-pdf-chunk`, {
+                const response = await fetch(`/api/customer/projects/${projectData.id}/upload-pdf`, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
