@@ -526,6 +526,8 @@ const BookPreviewModal = ({
                     }));
                     
                     return false;
+                } else {
+                    await response.json()
                 }
 
                 console.log(`✅ [UPLOAD-PDF] Chunk ${i + 1} uploaded successfully`);
