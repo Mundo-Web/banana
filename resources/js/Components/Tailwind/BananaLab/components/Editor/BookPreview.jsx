@@ -306,40 +306,27 @@ const BookPreviewModal = ({
 
     // Función para generar PDF directamente en el frontend usando las imágenes del flipbook
     const generatePDFSilently = async () => {
-        console.log('🎯 [FRONTEND-PDF] ========== FUNCIÓN LLAMADA ==========');
-        console.log('🎯 [FRONTEND-PDF] projectData:', projectData);
-        console.log('🎯 [FRONTEND-PDF] pdfGenerationInProgress:', pdfGenerationInProgress);
-
         if (!projectData?.id) {
-            console.warn('📄 [FRONTEND-PDF] No hay proyecto cargado.');
+            console.warn('📄 [FRONTEND-PDF] No project loaded.');
             return false;
         }
 
         // 🔧 PREVENIR MÚLTIPLES GENERACIONES SIMULTÁNEAS
         if (pdfGenerationInProgress) {
-            console.warn('⚠️ [FRONTEND-PDF] Generación ya en progreso, omitiendo llamada duplicada');
+            console.warn('⚠️ [FRONTEND-PDF] Generation already in progress, skipping duplicate call');
             return false;
         }
 
         setPdfGenerationInProgress(true);
-        console.log('🚀 [FRONTEND-PDF] Iniciando generación de PDF en el frontend...');
 
         try {
             // Usar las mismas imágenes que estamos mostrando en el flipbook
             const imagesToUse = Object.keys(activeThumbnails).length > 0 ? activeThumbnails : generatedThumbnails;
 
-            console.log('🔍 [FRONTEND-PDF] activeThumbnails:', Object.keys(activeThumbnails).length, 'elementos');
-            console.log('🔍 [FRONTEND-PDF] generatedThumbnails:', Object.keys(generatedThumbnails).length, 'elementos');
-            console.log('🔍 [FRONTEND-PDF] imagesToUse:', Object.keys(imagesToUse).length, 'elementos');
-
             if (Object.keys(imagesToUse).length === 0) {
-                console.warn('⚠️ [FRONTEND-PDF] No hay imágenes disponibles para el PDF');
-                console.log('⚠️ [FRONTEND-PDF] activeThumbnails:', activeThumbnails);
-                console.log('⚠️ [FRONTEND-PDF] generatedThumbnails:', generatedThumbnails);
+                console.warn('⚠️ [FRONTEND-PDF] No images available for PDF');
                 return false;
             }
-
-            console.log('🖼️ [FRONTEND-PDF] Usando', Object.keys(imagesToUse).length, 'imágenes del flipbook');
 
             // Create PDF document
             const pdfDoc = await PDFLib.PDFDocument.create();
@@ -356,7 +343,6 @@ const BookPreviewModal = ({
 
             for (const page of bookPages) {
                 const imageUrl = imagesToUse[page.originalId || page.id];
-
                 const pageIndex = bookPages.indexOf(page) + 1
 
                 if (imageUrl) {
@@ -418,31 +404,28 @@ const BookPreviewModal = ({
                         const currentProgress = progressStart + (progressPerPage * pageIndex);
                         setAlbumPreparationModal({
                             isOpen: true,
-                            message: "📄 Generando PDF...",
-                            subMessage: `Agregando página ${pageIndex} de ${totalPages}`,
+                            message: "📄 Generating PDF...",
+                            subMessage: `Adding page ${pageIndex} of ${totalPages}`,
                             progress: Math.round(currentProgress)
                         });
 
                         pageCount++
 
-                        console.log(`📄 [FRONTEND-PDF] Page ${pageIndex} added to PDF with dimensions ${pdfWidth}x${pdfHeight}`);
-
                     } catch (imageError) {
                         console.warn(`⚠️ [FRONTEND-PDF] Error adding page ${pageIndex}:`, imageError);
-                        console.warn('Image URL type:', imageUrl.substring(0, 50) + '...');
                     }
                 }
             }
 
             if (pageCount === 0) {
-                console.error('❌ [FRONTEND-PDF] No se pudo agregar ninguna página al PDF');
+                console.error('❌ [FRONTEND-PDF] Could not add any pages to PDF');
                 return false;
             }
 
             setAlbumPreparationModal({
                 isOpen: true,
-                message: "📄 Creando PDF...",
-                subMessage: "Generando archivo para tu álbum",
+                message: "📄 Creating PDF...",
+                subMessage: "Generating file for your album",
                 progress: 60
             });
 
@@ -450,111 +433,120 @@ const BookPreviewModal = ({
             const pdfBytes = await pdfDoc.save();
 
             // Convert to Blob
-            const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const pdfUrl = URL.createObjectURL(pdfBlob);
-            window.open(pdfUrl, '_blank');
-            console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
+            // const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+            // const pdfUrl = URL.createObjectURL(pdfBlob);
+            // window.open(pdfUrl, '_blank');
+
+            const pdfb64 = ArrayBufferToBase64(pdfBytes)
 
             // Update progress modal for upload phase
             setAlbumPreparationModal({
                 isOpen: true,
-                message: "📤 Subiendo PDF al servidor...",
-                subMessage: "Iniciando transferencia del archivo",
+                message: "📤 Uploading PDF to server...",
+                subMessage: "Starting file transfer",
                 progress: 61
             });
 
             // Upload PDF to server
-            console.log('🚀 [FRONTEND-PDF] Iniciando subida al servidor...');
-            const uploadResult = await uploadPDFToServer(pdfBlob);
-            console.log('🏁 [FRONTEND-PDF] Resultado de subida:', uploadResult);
+            const uploadResult = await uploadPDFToServer(pdfb64);
             return uploadResult;
 
         } catch (error) {
-            console.error('❌ [FRONTEND-PDF] Error generando PDF:', error);
+            console.error('❌ [FRONTEND-PDF] Error generating PDF:', error);
             return false;
         } finally {
             setPdfGenerationInProgress(false);
-            console.log('🏁 [FRONTEND-PDF] Proceso finalizado');
         }
     };
 
     // Función para subir el PDF generado al servidor
-    const uploadPDFToServer = async (pdfBlob) => {
+    const uploadPDFToServer = async (pdfBase64) => {
         try {
-            console.log('📤 [UPLOAD-PDF] Subiendo PDF al servidor...');
-            console.log('📤 [UPLOAD-PDF] Tamaño del blob:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB');
-            console.log('📤 [UPLOAD-PDF] Proyecto ID:', projectData.id);
+            console.log('📤 [UPLOAD-PDF] Starting chunked PDF upload to server...');
 
-            // 🔧 Guardar log persistente
             const logKey = `pdf_upload_log_${projectData.id}`;
+            
+            // Calculate base64 string length in bytes
+            const base64Length = pdfBase64.length;
+            const chunkSize = 25 * 1024 * 1024; // 25MB in bytes
+            
+            // Calculate number of chunks needed
+            const totalChunks = Math.ceil(base64Length / chunkSize);
+            
+            console.log(`📦 [UPLOAD-PDF] Splitting into ${totalChunks} chunks`);
+            
             localStorage.setItem(logKey, JSON.stringify({
                 timestamp: new Date().toISOString(),
-                step: 'iniciando_subida',
-                blobSize: pdfBlob.size,
+                step: 'starting_chunked_upload',
+                totalSize: base64Length,
+                chunks: totalChunks,
                 projectId: projectData.id
             }));
 
-            const formData = new FormData();
-            formData.append('pdf', pdfBlob, `${projectData.id}.pdf`);
-            formData.append('project_id', projectData.id);
-            formData.append('pages_count', createBookPages().length);
+            // Upload chunks sequentially
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, base64Length);
+                const chunk = pdfBase64.slice(start, end);
+                
+                // Create text file with chunk content
+                const chunkFile = new File([chunk], 'chunk.txt', {
+                    type: 'text/plain'
+                });
+                
+                const formData = new FormData();
+                formData.append('pdf_chunk', chunkFile);
+                formData.append('project_id', projectData.id);
+                formData.append('chunk_number', i + 1); 
+                formData.append('total_chunks', totalChunks);
+                formData.append('is_last', (i === totalChunks - 1).toString());
+                formData.append('pages_count', createBookPages().length);
 
-            console.log('📤 [UPLOAD-PDF] FormData preparado, enviando a:', `/api/customer/projects/${projectData.id}/upload-pdf`);
+                console.log(`📤 [UPLOAD-PDF] Uploading chunk ${i + 1}/${totalChunks}`);
 
-            const response = await fetch(`/api/customer/projects/${projectData.id}/upload-pdf`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                },
-                body: formData
-            });
+                const response = await fetch(`/api/customer/projects/${projectData.id}/upload-pdf-chunk`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    body: formData
+                });
 
-            console.log('📤 [UPLOAD-PDF] Respuesta del servidor:', response.status, response.statusText);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+                    console.error(`❌ [UPLOAD-PDF] Chunk ${i + 1} upload failed:`, errorData.message);
+                    
+                    localStorage.setItem(logKey, JSON.stringify({
+                        timestamp: new Date().toISOString(),
+                        step: 'chunk_upload_error',
+                        chunk: i + 1,
+                        status: response.status,
+                        error: errorData.message
+                    }));
+                    
+                    return false;
+                }
 
-            // 🔧 Actualizar log persistente
+                console.log(`✅ [UPLOAD-PDF] Chunk ${i + 1} uploaded successfully`);
+            }
+
+            console.log('✅ [UPLOAD-PDF] All chunks uploaded successfully');
+            
             localStorage.setItem(logKey, JSON.stringify({
                 timestamp: new Date().toISOString(),
-                step: 'respuesta_recibida',
-                status: response.status,
-                statusText: response.statusText
+                step: 'upload_success',
+                totalChunks: totalChunks
             }));
 
-            if (response.ok) {
-                const result = await response.json();
-                console.log('✅ [UPLOAD-PDF] PDF subido exitosamente:', result);
+            setPdfGenerated(true);
+            return true;
 
-                // 🔧 Log de éxito persistente
-                localStorage.setItem(logKey, JSON.stringify({
-                    timestamp: new Date().toISOString(),
-                    step: 'upload_exitoso',
-                    result: result
-                }));
-
-                setPdfGenerated(true);
-                return true;
-            } else {
-                const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
-                console.error('❌ [UPLOAD-PDF] Error subiendo PDF:', response.status, errorData.message);
-
-                // 🔧 Log de error persistente
-                localStorage.setItem(logKey, JSON.stringify({
-                    timestamp: new Date().toISOString(),
-                    step: 'error_upload',
-                    status: response.status,
-                    error: errorData.message
-                }));
-
-                return false;
-            }
         } catch (error) {
-            console.error('❌ [UPLOAD-PDF] Error en la subida:', error.message);
-            console.error('❌ [UPLOAD-PDF] Stack trace:', error);
+            console.error('❌ [UPLOAD-PDF] Upload error:', error.message);
 
-            // 🔧 Log de excepción persistente
-            const logKey = `pdf_upload_log_${projectData.id}`;
             localStorage.setItem(logKey, JSON.stringify({
                 timestamp: new Date().toISOString(),
-                step: 'excepcion',
+                step: 'exception',
                 error: error.message,
                 stack: error.stack
             }));
