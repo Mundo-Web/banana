@@ -405,8 +405,8 @@ const BookPreviewModal = ({
                         const currentProgress = progressStart + (progressPerPage * pageIndex);
                         setAlbumPreparationModal({
                             isOpen: true,
-                            message: "📄 Generating PDF...",
-                            subMessage: `Adding page ${pageIndex} of ${totalPages}`,
+                            message: "📄 Generando PDF...",
+                            subMessage: `Añadiendo página ${pageIndex} de ${totalPages}`,
                             progress: Math.round(currentProgress)
                         });
 
@@ -425,8 +425,8 @@ const BookPreviewModal = ({
 
             setAlbumPreparationModal({
                 isOpen: true,
-                message: "📄 Creating PDF...",
-                subMessage: "Generating file for your album",
+                message: "📄 Creando PDF...",
+                subMessage: "Generando archivo para tu álbum",
                 progress: 60
             });
 
@@ -443,8 +443,8 @@ const BookPreviewModal = ({
             // Update progress modal for upload phase
             setAlbumPreparationModal({
                 isOpen: true,
-                message: "📤 Uploading PDF to server...",
-                subMessage: "Starting file transfer",
+                message: "📤 Subiendo PDF al servidor...",
+                subMessage: "Iniciando transferencia de archivo",
                 progress: 61
             });
 
@@ -484,6 +484,11 @@ const BookPreviewModal = ({
                 projectId: projectData.id
             }));
 
+            // Calculate progress increment per chunk
+            const progressStart = 61;
+            const progressEnd = 65;
+            const progressPerChunk = (progressEnd - progressStart) / totalChunks;
+
             // Upload chunks sequentially
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * chunkSize;
@@ -505,6 +510,15 @@ const BookPreviewModal = ({
 
                 console.log(`📤 [UPLOAD-PDF] Uploading chunk ${i + 1}/${totalChunks}`);
 
+                // Update progress modal for each chunk
+                const currentProgress = progressStart + (progressPerChunk * (i + 1));
+                setAlbumPreparationModal({
+                    isOpen: true,
+                    message: "📤 Subiendo PDF al servidor...",
+                    subMessage: `Subiendo parte ${i + 1} de ${totalChunks}`,
+                    progress: Math.round(currentProgress)
+                });
+
                 const response = await fetch(`/api/customer/projects/${projectData.id}/upload-pdf`, {
                     method: 'POST',
                     headers: {
@@ -516,6 +530,13 @@ const BookPreviewModal = ({
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
                     console.error(`❌ [UPLOAD-PDF] Chunk ${i + 1} upload failed:`, errorData.message);
+                    
+                    setAlbumPreparationModal({
+                        isOpen: true,
+                        message: "❌ Error al subir PDF",
+                        subMessage: `Error en la parte ${i + 1} de ${totalChunks}`,
+                        progress: currentProgress
+                    });
                     
                     localStorage.setItem(logKey, JSON.stringify({
                         timestamp: new Date().toISOString(),
@@ -535,6 +556,13 @@ const BookPreviewModal = ({
 
             console.log('✅ [UPLOAD-PDF] All chunks uploaded successfully');
             
+            setAlbumPreparationModal({
+                isOpen: true,
+                message: "✅ PDF subido exitosamente",
+                subMessage: "Archivo guardado en el servidor",
+                progress: 65
+            });
+            
             localStorage.setItem(logKey, JSON.stringify({
                 timestamp: new Date().toISOString(),
                 step: 'upload_success',
@@ -546,6 +574,13 @@ const BookPreviewModal = ({
 
         } catch (error) {
             console.error('❌ [UPLOAD-PDF] Upload error:', error.message);
+
+            setAlbumPreparationModal({
+                isOpen: true,
+                message: "❌ Error al subir PDF",
+                subMessage: "Ocurrió un error inesperado",
+                progress: 61
+            });
 
             localStorage.setItem(logKey, JSON.stringify({
                 timestamp: new Date().toISOString(),

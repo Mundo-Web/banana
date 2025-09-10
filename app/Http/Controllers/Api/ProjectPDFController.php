@@ -601,45 +601,41 @@ class ProjectPDFController extends Controller
 
             // If this is the last chunk, combine all chunks into final PDF
             if ($isLast) {
-                $base64Content = '';
-                
-                // Combine all chunks
-                for ($i = 1; $i <= $totalChunks; $i++) {
-                    $currentChunkPath = "{$chunksDirectory}/chunk_{$i}.txt";
-                    if (!Storage::exists($currentChunkPath)) {
-                        throw new \Exception("Missing chunk file: {$i}");
-                    }
-                    $base64Content .= Storage::get($currentChunkPath);
-                }
-
-                // Decode base64 to PDF content
-                $pdfContent = base64_decode($base64Content);
-
-                // Save final PDF
                 $projectDirectory = "images/pdf/{$projectId}";
                 if (!Storage::exists($projectDirectory)) {
                     Storage::makeDirectory($projectDirectory, 0775, true);
                 }
 
                 $filename = "{$projectId}.pdf";
-                $pdfPath = "{$projectDirectory}/{$filename}";
+                $pdfPath = storage_path("app/{$projectDirectory}/{$filename}");
 
-                // Delete existing PDF if exists
-                if (Storage::exists($pdfPath)) {
-                    Storage::delete($pdfPath);
+                // Abrir archivo final en modo escritura binaria
+                $fp = fopen($pdfPath, 'wb');
+
+                for ($i = 1; $i <= $totalChunks; $i++) {
+                    $currentChunkPath = "{$chunksDirectory}/chunk_{$i}.txt";
+
+                    if (!Storage::exists($currentChunkPath)) {
+                        throw new \Exception("Missing chunk file: {$i}");
+                    }
+
+                    // Leer chunk base64, decodificar y escribir directo al archivo
+                    $chunkBase64 = Storage::get($currentChunkPath);
+                    $chunkBinary = base64_decode($chunkBase64);
+                    fwrite($fp, $chunkBinary);
                 }
 
-                // Save new PDF using file_put_contents
-                file_put_contents(storage_path('app/' . $pdfPath), $pdfContent);
+                fclose($fp);
 
-                // Clean up chunk files
+                // Limpiar chunks
                 Storage::deleteDirectory($chunksDirectory);
 
-                // Update project with PDF info
-                $fileSize = Storage::size($pdfPath);
+                // Ya puedes usar Storage::size() si necesitas el tamaño
+                $fileSize = filesize($pdfPath);
+
                 $project->update([
                     'pdf_generated' => true,
-                    'pdf_path' => $pdfPath,
+                    'pdf_path' => $projectDirectory . '/' . $filename,
                     'pdf_size' => $fileSize,
                     'pdf_pages_count' => $pagesCount,
                     'pdf_generated_at' => now(),
@@ -664,14 +660,13 @@ class ProjectPDFController extends Controller
                 'success' => true,
                 'message' => "Chunk {$chunkNumber} of {$totalChunks} saved successfully"
             ]);
-
         } catch (\Exception $e) {
             // Clean up chunks directory in case of error
             $chunksDirectory = "images/pdf/{$projectId}/chunks";
             if (Storage::exists($chunksDirectory)) {
                 Storage::deleteDirectory($chunksDirectory);
             }
-            
+
             return response()->json([
                 'error' => 'Error processing PDF: ' . $e->getMessage()
             ], 500);

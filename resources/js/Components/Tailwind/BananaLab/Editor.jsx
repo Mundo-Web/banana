@@ -2006,6 +2006,7 @@ export default function EditorLibro() {
         // Función de guardado silencioso en segundo plano
         const performSilentAutoSave = async () => {
             if (!hasUnsavedChanges) return;
+            return
 
             try {
 
