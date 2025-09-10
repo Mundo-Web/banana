@@ -5165,7 +5165,7 @@ export default function EditorLibro() {
                                                 try {
                                                     // Create mirror image and get blob URI
                                                     const mainElement = document.getElementById(`page-${page.id}`)
-                                                    const thumbnail = await createMirrorImage(mainElement, 1000, 'base64');
+                                                    const thumbnail = await createMirrorImage(mainElement, 1000, 'blob');
                                                     pdfThumbnails[page.id] = thumbnail;
 
                                                     // Calculate and update progress
