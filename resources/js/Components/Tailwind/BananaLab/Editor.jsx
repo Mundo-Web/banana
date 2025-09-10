@@ -3012,6 +3012,7 @@ export default function EditorLibro() {
         }
 
         try {
+            setShowProgressRecovery(true);
             // Load progress from server
             const response = await fetch(`/api/canvas/projects/${projectData.id}/load-progress`, {
                 headers: {
@@ -3020,6 +3021,7 @@ export default function EditorLibro() {
                 },
                 credentials: 'include'
             });
+            setShowProgressRecovery(false);
 
             let serverProgress = null;
             if (response.ok) {
@@ -3038,10 +3040,10 @@ export default function EditorLibro() {
                 const now = Date.now();
                 const timeDiff = now - progressTime;
 
-                if (timeDiff < 30 * 60 * 1000) {
+                // if (timeDiff < 30 * 60 * 1000) {
                     toast.info('🔄 Loading auto-saved progress...');
                     handleLoadProgress(serverProgress);
-                }
+                // }
             }
 
         } catch (error) {
@@ -3080,8 +3082,8 @@ export default function EditorLibro() {
                 toast.success('✅ Progreso cargado exitosamente');
 
                 // Cerrar el modal automáticamente si estaba abierto
-                setShowProgressRecovery(false);
             }
+            setShowProgressRecovery(false);
 
         } catch (error) {
             console.error('❌ [RECOVERY] Error cargando progreso:', error);
