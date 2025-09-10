@@ -629,8 +629,8 @@ class ProjectPDFController extends Controller
                     Storage::delete($pdfPath);
                 }
 
-                // Save new PDF
-                Storage::put($pdfPath, $pdfContent);
+                // Save new PDF using file_put_contents
+                file_put_contents(storage_path('app/' . $pdfPath), $pdfContent);
 
                 // Clean up chunk files
                 Storage::deleteDirectory($chunksDirectory);
