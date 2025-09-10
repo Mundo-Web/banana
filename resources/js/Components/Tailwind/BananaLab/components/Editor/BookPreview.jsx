@@ -346,10 +346,18 @@ const BookPreviewModal = ({
 
             // Get ordered pages
             const bookPages = createBookPages();
-            let pageCount = 0;
+            let pageCount = 1;
+
+            // Calculate progress increment per page
+            const totalPages = bookPages.length - 1;
+            const progressStart = 30;
+            const progressEnd = 60;
+            const progressPerPage = (progressEnd - progressStart) / totalPages;
 
             for (const page of bookPages) {
                 const imageUrl = imagesToUse[page.originalId || page.id];
+
+                const pageIndex = bookPages.indexOf(page) + 1
 
                 if (imageUrl) {
                     try {
@@ -391,22 +399,36 @@ const BookPreviewModal = ({
                             }
                         }
 
+                        const dpi = projectData.canvas_preset.dpi
+                        const pdfWidth = Math.round(((projectData.canvas_preset.width / 25.4) * dpi) / 2)
+                        const pdfHeight = Math.round(((projectData.canvas_preset.height / 25.4) * dpi) / 2)
+
                         // Create new page with image dimensions
-                        const pdfPage = pdfDoc.addPage([image.width, image.height]);
+                        const pdfPage = pdfDoc.addPage([pdfWidth, pdfHeight]);
 
                         // Draw image on page using original dimensions
                         pdfPage.drawImage(image, {
                             x: 0,
                             y: 0,
-                            width: image.width,
-                            height: image.height
+                            width: pdfWidth,
+                            height: pdfHeight
                         });
 
-                        pageCount++;
-                        console.log(`📄 [FRONTEND-PDF] Page ${pageCount} added to PDF with dimensions ${image.width}x${image.height}`);
+                        // Update progress modal for each page added
+                        const currentProgress = progressStart + (progressPerPage * pageIndex);
+                        setAlbumPreparationModal({
+                            isOpen: true,
+                            message: "📄 Generando PDF...",
+                            subMessage: `Agregando página ${pageIndex} de ${totalPages}`,
+                            progress: Math.round(currentProgress)
+                        });
+
+                        pageCount++
+
+                        console.log(`📄 [FRONTEND-PDF] Page ${pageIndex} added to PDF with dimensions ${pdfWidth}x${pdfHeight}`);
 
                     } catch (imageError) {
-                        console.warn(`⚠️ [FRONTEND-PDF] Error adding page ${pageCount + 1}:`, imageError);
+                        console.warn(`⚠️ [FRONTEND-PDF] Error adding page ${pageIndex}:`, imageError);
                         console.warn('Image URL type:', imageUrl.substring(0, 50) + '...');
                     }
                 }
@@ -417,12 +439,29 @@ const BookPreviewModal = ({
                 return false;
             }
 
+            setAlbumPreparationModal({
+                isOpen: true,
+                message: "📄 Creando PDF...",
+                subMessage: "Generando archivo para tu álbum",
+                progress: 60
+            });
+
             // Generate PDF bytes
             const pdfBytes = await pdfDoc.save();
 
             // Convert to Blob
             const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
             console.log('✅ [FRONTEND-PDF] PDF generado:', (pdfBlob.size / 1024 / 1024).toFixed(2) + ' MB,', pageCount, 'páginas');
+
+            // Update progress modal for upload phase
+            setAlbumPreparationModal({
+                isOpen: true,
+                message: "📤 Subiendo PDF al servidor...",
+                subMessage: "Iniciando transferencia del archivo",
+                progress: 61
+            });
 
             // Upload PDF to server
             console.log('🚀 [FRONTEND-PDF] Iniciando subida al servidor...');

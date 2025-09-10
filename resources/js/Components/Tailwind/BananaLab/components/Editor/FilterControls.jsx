@@ -42,11 +42,11 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
             ...defaultFilters,
             [key]: value
         };
-        console.log('🎨 [FilterControls] Actualizando filtro:', { key, value, newFilters });
+        // console.log('🎨 [FilterControls] Actualizando filtro:', { key, value, newFilters });
         
         // 🚨 SOLUCIÓN CRÍTICA: Limpiar caché de thumbnails antes de aplicar el filtro
         if (window.FORCE_THUMBNAIL_REGENERATION) {
-            console.log('🧨 [EMERGENCIA] Limpiando caché y forzando regeneración por cambio en: ' + key);
+            // console.log('🧨 [EMERGENCIA] Limpiando caché y forzando regeneración por cambio en: ' + key);
             if (window.thumbnailCache) window.thumbnailCache = {};
         }
         
@@ -56,7 +56,7 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
         // 🚨 SOLUCIÓN CRÍTICA: Forzar regeneración después de aplicar el filtro
         if (window.FORCE_THUMBNAIL_REGENERATION && window.forceRegenerateThumbnail) {
             setTimeout(() => {
-                console.log('🚀 [EMERGENCIA] Ejecutando regeneración forzada después de cambio en: ' + key);
+                // console.log('🚀 [EMERGENCIA] Ejecutando regeneración forzada después de cambio en: ' + key);
                 try {
                     // Permitir explícitamente esta regeneración
                     if (window._allowNextRegeneration) {
