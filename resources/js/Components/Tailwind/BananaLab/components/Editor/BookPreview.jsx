@@ -8,6 +8,7 @@ import Global from "../../../../../Utils/Global";
 import { layouts } from '../../constants/layouts';
 // Import pdf-lib dynamically
 import * as PDFLib from 'pdf-lib';
+import ArrayBufferToBase64 from "../../../../../Utils/ArrayBufferToBase64";
 
 // Estilos para el modal
 const customStyles = {
