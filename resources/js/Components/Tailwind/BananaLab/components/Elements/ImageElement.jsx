@@ -320,13 +320,14 @@ export default function ImageElement({
 
     // Función para manejar atajos de teclado
     const handleKeyDown = useCallback((e) => {
-        if (!isSelected || disableResize) return;
+        if (!isSelected) return;
 
         const step = e.shiftKey ? 10 : 1; // Movimiento más grande con Shift
         let updates = {};
 
         switch (e.key) {
             case 'ArrowLeft':
+                if (disableResize) return;
                 e.preventDefault();
                 updates.position = {
                     x: Math.max(0, toRelative(currentPosition.x - step, workspaceSize.width)),
@@ -334,6 +335,7 @@ export default function ImageElement({
                 };
                 break;
             case 'ArrowRight':
+                if (disableResize) return;
                 e.preventDefault();
                 updates.position = {
                     x: Math.min(1, toRelative(currentPosition.x + step, workspaceSize.width)),
@@ -341,6 +343,7 @@ export default function ImageElement({
                 };
                 break;
             case 'ArrowUp':
+                if (disableResize) return;
                 e.preventDefault();
                 updates.position = {
                     x: toRelative(currentPosition.x, workspaceSize.width),
@@ -348,6 +351,7 @@ export default function ImageElement({
                 };
                 break;
             case 'ArrowDown':
+                if (disableResize) return;
                 e.preventDefault();
                 updates.position = {
                     x: toRelative(currentPosition.x, workspaceSize.width),

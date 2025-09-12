@@ -181,8 +181,8 @@
     "file": "assets/DxButton-DV0H-ZcL.js",
     "name": "DxButton"
   },
-  "_FilterControls-Cl3Tk68h.js": {
-    "file": "assets/FilterControls-Cl3Tk68h.js",
+  "_FilterControls-DPbnJyo6.js": {
+    "file": "assets/FilterControls-DPbnJyo6.js",
     "name": "FilterControls",
     "imports": [
       "_createLucideIcon-Cy5Ya80P.js",
@@ -4210,7 +4210,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-DQb43FFo.js",
+    "file": "assets/BananaLab-C3rw1TPv.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isDynamicEntry": true,
@@ -4269,7 +4269,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor.jsx": {
-    "file": "assets/Editor-B2AVu0Kb.js",
+    "file": "assets/Editor-CZiEjjsT.js",
     "name": "Editor",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
     "isDynamicEntry": true,
@@ -4277,7 +4277,7 @@
       "_preload-helper-BfFHrpNk.js",
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BH53Isel.js",
-      "_FilterControls-Cl3Tk68h.js",
+      "_FilterControls-DPbnJyo6.js",
       "resources/js/Components/Tailwind/BananaLab/utils/thumbnailGenerator.jsx",
       "_dataUrlToBlobUrl-D3JvlFJz.js",
       "node_modules/pdf-lib/es/index.js",
@@ -4329,7 +4329,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/EditorOriginal.jsx": {
-    "file": "assets/EditorOriginal-DnIyMctU.js",
+    "file": "assets/EditorOriginal-D0QwhZ-l.js",
     "name": "EditorOriginal",
     "src": "resources/js/Components/Tailwind/BananaLab/EditorOriginal.jsx",
     "isEntry": true,
@@ -4368,7 +4368,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor_00.jsx": {
-    "file": "assets/Editor_00-CA8IJ0VK.js",
+    "file": "assets/Editor_00-CkAy5uZv.js",
     "name": "Editor_00",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor_00.jsx",
     "isEntry": true,
@@ -4443,7 +4443,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx": {
-    "file": "assets/V1Edit-Baizw58x.js",
+    "file": "assets/V1Edit-B8kFFIiZ.js",
     "name": "V1Edit",
     "src": "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
     "isEntry": true,
@@ -4544,7 +4544,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx": {
-    "file": "assets/EditorLayout-BdqVsZ0A.js",
+    "file": "assets/EditorLayout-PTxsFlx9.js",
     "name": "EditorLayout",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
     "isEntry": true,
@@ -4566,7 +4566,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx": {
-    "file": "assets/EditorMain-pmNS9bYK.js",
+    "file": "assets/EditorMain-CUhyITuy.js",
     "name": "EditorMain",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
     "isEntry": true,
@@ -4658,7 +4658,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/PageEditor.jsx": {
-    "file": "assets/PageEditor-BUFx4sHU.js",
+    "file": "assets/PageEditor-Bs7rBVAX.js",
     "name": "PageEditor",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/PageEditor.jsx",
     "isEntry": true,
@@ -10017,7 +10017,7 @@
     ]
   },
   "resources/js/Pages/Canvas/Editor.jsx": {
-    "file": "assets/Editor-DaGWql7h.js",
+    "file": "assets/Editor-KaYdq_xA.js",
     "name": "Editor",
     "src": "resources/js/Pages/Canvas/Editor.jsx",
     "isEntry": true,
@@ -10030,7 +10030,7 @@
       "_index-NIGUFBhG.js",
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js",
       "_preload-helper-BfFHrpNk.js",
-      "_FilterControls-Cl3Tk68h.js",
+      "_FilterControls-DPbnJyo6.js",
       "_createLucideIcon-Cy5Ya80P.js",
       "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorMain.jsx",
       "_index-BJa4kPFi.js",
@@ -10229,7 +10229,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-BE7h_PxA.js",
+    "file": "assets/System-B1NToBco.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
