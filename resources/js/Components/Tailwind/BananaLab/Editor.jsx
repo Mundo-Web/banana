@@ -555,7 +555,7 @@ export default function EditorLibro() {
     const [activeTab, setActiveTab] = useState("pages");
     const [history, setHistory] = useState([JSON.stringify(pages)]);
     const [historyIndex, setHistoryIndex] = useState(0);
-    const [previewMode, setPreviewMode] = useState(false);
+    // const [previewMode, setPreviewMode] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [pageThumbnails, setPageThumbnails] = useState({});
 
@@ -3032,7 +3032,7 @@ export default function EditorLibro() {
             }
 
             // Use server progress if available
-            if (serverProgress && 
+            if (serverProgress &&
                 (serverProgress.design_data?.pages?.length > 0)) {
 
                 // Check if progress is from last 30 minutes
@@ -3041,8 +3041,8 @@ export default function EditorLibro() {
                 const timeDiff = now - progressTime;
 
                 // if (timeDiff < 30 * 60 * 1000) {
-                    toast.info('🔄 Loading auto-saved progress...');
-                    handleLoadProgress(serverProgress);
+                toast.info('🔄 Loading auto-saved progress...');
+                handleLoadProgress(serverProgress);
                 // }
             }
 
@@ -3468,27 +3468,6 @@ export default function EditorLibro() {
             setTextToolbarVisible(false);
             setSelectedImage(null);
         }
-    };
-
-    // 🔧 MEJORADO: Obtener el layout actual con información adicional
-    const getCurrentLayout = () => {
-        if (pages.length === 0) return layouts[0];
-
-        const currentPageData = pages[currentPage];
-        if (!currentPageData) return layouts[0];
-
-        const layout = layouts.find((layout) => layout.id === currentPageData.layout) || layouts[0];
-
-        // 🔧 AÑADIR: Información adicional sobre complejidad del layout
-        const isComplexLayout = layout.cellStyles && Object.values(layout.cellStyles).some(style =>
-            style.includes('col-span-') || style.includes('row-span-')
-        );
-
-        return {
-            ...layout,
-            isComplex: isComplexLayout,
-            pageId: currentPageData.id
-        };
     };
 
     // 🚀 OPTIMIZACIÓN: Función debounced para localStorage
@@ -6261,7 +6240,7 @@ export default function EditorLibro() {
 
 
                             {/* Canvas workspace - centered */}
-                            <div id="editor-workspace" className={`editor-workspace flex-1 relative flex items-center justify-center p-6 overflow-hidden bg-gray-100 ${previewMode ? 'preview-mode' : ''}`}>
+                            <div id="editor-workspace" className={`editor-workspace flex-1 relative flex items-center justify-center p-6 overflow-hidden bg-gray-100`}>
                                 {pages.map((page, pageIndex) => {
                                     // Get layout directly from layouts array
                                     const layout = layouts.find(l => l.id === page.layout) || layouts[0];
@@ -6276,7 +6255,7 @@ export default function EditorLibro() {
 
                                     return (
                                         <div key={page.id} hidden={currentPage !== pageIndex}>
-                                            {previewMode ? (
+                                            {/* {previewMode ? (
                                                 <div className="bg-white rounded-lg shadow-lg">
                                                     <div
                                                         className="overflow-hidden"
@@ -6314,81 +6293,82 @@ export default function EditorLibro() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                            ) : (
+                                            ) : ( */}
+                                            <div
+                                                id={`page-${page.id}`}
+                                                className="shadow-xl overflow-hidden"
+                                                style={{
+                                                    width: workspaceDimensions.width,
+                                                    height: workspaceDimensions.height,
+                                                    position: 'relative',
+                                                    backgroundColor: page?.backgroundColor || '#ffffff',
+                                                    backgroundImage: page?.backgroundImage ? `url(${page.backgroundImage})` : 'none',
+                                                    backgroundSize: 'cover',
+                                                    backgroundPosition: 'center',
+                                                    backgroundRepeat: 'no-repeat'
+                                                }}
+                                            >
+                                                {/* Background layer */}
+                                                {(() => {
+                                                    if (page?.backgroundImage) {
+                                                        return (
+                                                            <img
+                                                                src={page.backgroundImage}
+                                                                alt="background"
+                                                                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                                                                style={{
+                                                                    zIndex: 1,
+                                                                }}
+                                                            />
+                                                        );
+                                                    } else if (page?.backgroundColor) {
+                                                        return (
+                                                            <div
+                                                                className="absolute inset-0 w-full h-full pointer-events-none"
+                                                                style={{
+                                                                    backgroundColor: page.backgroundColor,
+                                                                    zIndex: 1,
+                                                                }}
+                                                            />
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+
+                                                {/* Editable cells layer */}
                                                 <div
-                                                    id={`page-${page.id}`}
-                                                    className="shadow-xl overflow-hidden"
+                                                    className={`grid ${currentLayout.template}`}
                                                     style={{
-                                                        width: workspaceDimensions.width,
-                                                        height: workspaceDimensions.height,
                                                         position: 'relative',
-                                                        backgroundColor: page?.backgroundColor || '#ffffff',
-                                                        backgroundImage: page?.backgroundImage ? `url(${page.backgroundImage})` : 'none',
-                                                        backgroundSize: 'cover',
-                                                        backgroundPosition: 'center',
-                                                        backgroundRepeat: 'no-repeat'
+                                                        zIndex: 10,
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        boxSizing: 'border-box',
+                                                        gap: currentLayout.style?.gap || '16px',
+                                                        padding: currentLayout.style?.padding || '16px'
                                                     }}
                                                 >
-                                                    {/* Background layer */}
-                                                    {(() => {
-                                                        if (page?.backgroundImage) {
-                                                            return (
-                                                                <img
-                                                                    src={page.backgroundImage}
-                                                                    alt="background"
-                                                                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                                                                    style={{
-                                                                        zIndex: 1,
-                                                                    }}
-                                                                />
-                                                            );
-                                                        } else if (page?.backgroundColor) {
-                                                            return (
-                                                                <div
-                                                                    className="absolute inset-0 w-full h-full pointer-events-none"
-                                                                    style={{
-                                                                        backgroundColor: page.backgroundColor,
-                                                                        zIndex: 1,
-                                                                    }}
-                                                                />
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
-
-                                                    {/* Editable cells layer */}
-                                                    <div
-                                                        className={`grid ${currentLayout.template}`}
-                                                        style={{
-                                                            position: 'relative',
-                                                            zIndex: 10,
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            boxSizing: 'border-box',
-                                                            gap: currentLayout.style?.gap || '16px',
-                                                            padding: currentLayout.style?.padding || '16px'
-                                                        }}
-                                                    >
-                                                        {page.cells.map((cell) => (
-                                                            <EditableCell
-                                                                key={cell.id}
-                                                                id={cell.id}
-                                                                elements={cell.elements.filter(el => !el.locked)}
-                                                                workspaceSize={workspaceDimensions}
-                                                                cellStyle={currentLayout.cellStyles?.[page.cells.indexOf(cell)]}
-                                                                selectedElement={selectedCell === cell.id ? selectedElement : null}
-                                                                onSelectElement={handleSelectElement}
-                                                                onAddElement={(element, cellId) => addElementToCell(cellId, element)}
-                                                                onUpdateElement={(elementId, updates, isDuplicate) =>
-                                                                    updateElementInCell(cell.id, elementId, updates, isDuplicate)}
-                                                                onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
-                                                                availableMasks={currentLayout.maskCategories.flatMap((cat) => cat.masks)}
-                                                                projectData={projectData}
-                                                            />
-                                                        ))}
-                                                    </div>
+                                                    {page.cells.map((cell) => (
+                                                        <EditableCell
+                                                            key={cell.id}
+                                                            id={cell.id}
+                                                            elements={cell.elements.filter(el => !el.locked)}
+                                                            workspaceSize={workspaceDimensions}
+                                                            cellStyle={currentLayout.cellStyles?.[page.cells.indexOf(cell)]}
+                                                            selectedElement={selectedCell === cell.id ? selectedElement : null}
+                                                            onSelectElement={handleSelectElement}
+                                                            onAddElement={(element, cellId) => addElementToCell(cellId, element)}
+                                                            onUpdateElement={(elementId, updates, isDuplicate) =>
+                                                                updateElementInCell(cell.id, elementId, updates, isDuplicate)}
+                                                            onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
+                                                            availableMasks={currentLayout.maskCategories.flatMap((cat) => cat.masks)}
+                                                            projectData={projectData}
+                                                            unique={page.cells.length == 1}
+                                                        />
+                                                    ))}
                                                 </div>
-                                            )}
+                                            </div>
+                                            {/* )} */}
                                         </div>
                                     );
                                 })}

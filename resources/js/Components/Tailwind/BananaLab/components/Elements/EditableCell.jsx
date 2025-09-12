@@ -17,6 +17,7 @@ export default function EditableCell({
     cellSize = "auto", // Tamaño específico de esta celda si se necesita
     cellStyle = "", // Estilo dinámico del layout
     projectData = null, // Datos del proyecto para upload
+    unique = false
 }) {
     // 📏 CONFIGURACIÓN DE VALIDACIÓN DE IMÁGENES
     const IMAGE_VALIDATION = {
@@ -47,8 +48,6 @@ export default function EditableCell({
             fileSizeMB: (file.size / (1024 * 1024)).toFixed(2)
         };
     };
-
-
 
     // 📤 FUNCIÓN PARA SUBIR IMAGEN AL SERVIDOR (CON VALIDACIÓN SIMPLE)
     const uploadImageToServer = async (file) => {
@@ -109,23 +108,19 @@ export default function EditableCell({
         if (!validation.isValid) {
             console.error('❌ [VALIDATION] Archivo inválido:', validation.errors);
 
-            // Mostrar todos los errores de validación
             validation.errors.forEach(error => {
                 toast.error(error, {
-                    duration: 5000, // Mostrar por más tiempo para que el usuario pueda leer
+                    duration: 5000,
                 });
             });
 
             return null;
         }
 
-        // 🚀 SUBIR ARCHIVO VALIDADO
         const formData = new FormData();
-        // formData.append('image', file);
         formData.append('image', fileToUpload);
         formData.append('projectId', projectData.id);
 
-        // Mostrar toast de progreso
         const uploadToast = toast.loading(`📤 Subiendo imagen (${validation.fileSizeMB}MB)...`);
 
         try {
@@ -163,14 +158,11 @@ export default function EditableCell({
 
                 console.log(`🎯 [DROP] Recibidos ${files.length} archivos por drag & drop`);
 
-                // Procesar cada archivo
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
 
-                    // Validación rápida antes del upload
                     const quickValidation = validateImageFile(file);
                     if (!quickValidation.isValid) {
-                        // Si hay errores, mostrar y continuar con el siguiente archivo
                         quickValidation.errors.forEach(error => toast.error(error, { duration: 5000 }));
                         continue;
                     }
@@ -197,7 +189,7 @@ export default function EditableCell({
                                 blendMode: "normal",
                             },
                             mask: "none",
-                            zIndex: elements.length + i + 1, // Z-index automático incremental
+                            zIndex: elements.length + i + 1,
                         };
                         onAddElement(newElement, id);
                         console.log('[EditableCell] onAddElement via drop', { cellId: id, elementId: newElement.id });
@@ -205,7 +197,6 @@ export default function EditableCell({
                     }
                 }
             } else if (item.type === "PROJECT_IMAGE") {
-                // Manejar drag & drop desde la galería de imágenes del proyecto
                 const newElement = {
                     id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     type: "image",
@@ -225,7 +216,7 @@ export default function EditableCell({
                         blendMode: "normal",
                     },
                     mask: "none",
-                    zIndex: elements.length + 1, // Z-index automático
+                    zIndex: elements.length + 1,
                 };
                 onAddElement(newElement, id);
                 console.log('[EditableCell] onAddElement from gallery', { cellId: id, elementId: newElement.id });
@@ -242,7 +233,7 @@ export default function EditableCell({
         const input = document.createElement("input");
         input.type = "file";
         input.accept = IMAGE_VALIDATION.allowedTypes.join(',');
-        input.multiple = true; // Permitir múltiples archivos
+        input.multiple = true;
 
         input.onchange = async (e) => {
             if (e.target.files) {
@@ -250,15 +241,6 @@ export default function EditableCell({
 
                 console.log(`📁 [FILE-EXPLORER] Seleccionados ${files.length} archivos`);
 
-                // Mostrar información sobre límites si hay archivos grandes
-                const largeFiles = files.filter(file => file.size > IMAGE_VALIDATION.maxSizeBytes);
-                /*  if (largeFiles.length > 0) {
-                      toast.warning(`⚠️ ${largeFiles.length} imagen(es) exceden el límite de ${IMAGE_VALIDATION.maxSizeMB}MB y serán rechazadas`, {
-                          duration: 6000
-                      });
-                  }*/
-
-                // Procesar archivos uno por uno
                 let successCount = 0;
                 let rejectedCount = 0;
 
@@ -288,7 +270,7 @@ export default function EditableCell({
                                 blendMode: "normal",
                             },
                             mask: "none",
-                            zIndex: elements.length + i + 1, // Z-index automático incremental
+                            zIndex: elements.length + i + 1,
                         };
                         onAddElement(newElement, id);
                         console.log('[EditableCell] onAddElement', { cellId: id, elementId: newElement.id });
@@ -298,13 +280,11 @@ export default function EditableCell({
                         rejectedCount++;
                     }
 
-                    // Pequeña pausa entre uploads para no sobrecargar
                     if (i < files.length - 1) {
                         await new Promise(resolve => setTimeout(resolve, 100));
                     }
                 }
 
-                // Mostrar resumen final
                 if (files.length > 1) {
                     if (rejectedCount === 0) {
                         toast.success(`✅ ${successCount} imágenes subidas exitosamente`);
@@ -320,13 +300,12 @@ export default function EditableCell({
         input.click();
     };
 
-    // Determinar si la celda tiene contenido para aplicar el border correcto
     const hasContent = elements.length > 0;
 
     return (
         <div
             ref={drop}
-            data-cell-id={id} // 🔧 Identificador para captura de layouts
+            data-cell-id={id}
             className={`relative w-full h-full ${cellStyle || 'rounded-lg overflow-hidden'} ${isOver ? "ring-2 ring-purple-500 bg-transparent" : ""
                 } ${!hasContent
                     ? "border-2 border-dashed border-gray-300 bg-transparent hover:border-gray-400 hover:bg-transparent hover:text-white"
@@ -340,18 +319,17 @@ export default function EditableCell({
             style={{
                 isolation: "isolate",
                 background: hasContent ? "transparent" : undefined,
-                minHeight: "120px", // Altura mínima para celdas muy pequeñas
+                minHeight: "120px",
             }}
         >
             {elements.length === 0 ? (<>
                 <div
-                data-upload
+                    data-upload
                     className="absolute group inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
                     onClick={(e) => {
                         e.stopPropagation();
                         openFileExplorer();
                     }}
-
                 >
                     <Upload className="h-8 w-8 text-gray-300 group-hover:text-white transition-colors" />
                     <p className="text-sm text-gray-400 group-hover:text-white text-center transition-colors">
@@ -362,7 +340,6 @@ export default function EditableCell({
                         <p className="opacity-75">JPG, PNG, WebP, GIF</p>
                     </div>
 
-                    {/* Indicador de drag over */}
                     {isOver && (
                         <div className="absolute inset-0 bg-purple-500/20 border-2 border-purple-500 border-dashed rounded-lg flex items-center justify-center">
                             <div className="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-medium">
@@ -371,8 +348,7 @@ export default function EditableCell({
                         </div>
                     )}
                 </div>
-            </>
-            ) : (
+            </>) : (
                 elements.map((element) => (
                     <div
                         key={element.id}
@@ -384,12 +360,11 @@ export default function EditableCell({
                                 element={element}
                                 isSelected={selectedElement === element.id}
                                 onSelect={() => onSelectElement(element.id, id)}
-                                onUpdate={(updates) =>
-                                    onUpdateElement(element.id, updates)
-                                }
+                                onUpdate={(updates) => onUpdateElement(element.id, updates)}
                                 onDelete={() => onDeleteElement(element.id)}
                                 availableMasks={availableMasks}
                                 workspaceSize={workspaceSize}
+                                disableResize={!unique}
                             />
                         ) : (
                             <TextElement
@@ -409,7 +384,7 @@ export default function EditableCell({
         </div>
     );
 }
-// 🔍 FUNCIÓN DE UTILIDAD PARA DEBUGGING DE VALIDACIÓN
+
 export const debugImageValidation = (file) => {
     const validation = {
         maxSizeBytes: 2 * 1024 * 1024,
@@ -432,7 +407,6 @@ export const debugImageValidation = (file) => {
     });
 };
 
-// Exponer función globalmente para debugging
 if (typeof window !== 'undefined') {
     window.debugImageValidation = debugImageValidation;
 }

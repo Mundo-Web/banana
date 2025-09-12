@@ -2,7 +2,6 @@ import { useDrag } from "react-dnd";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { RotateCw, Trash2, Replace, Copy, CircleDot } from "lucide-react";
 import { imageMasks } from "../../constants/masks";
-
 export default function ImageElement({
     element,
     isSelected,
@@ -10,6 +9,7 @@ export default function ImageElement({
     onUpdate,
     onDelete,
     availableMasks = [],
+    disableResize,
     workspaceSize = { width: 800, height: 600 },
 }) {
     const [{ isDragging }, drag] = useDrag(() => ({
@@ -60,7 +60,7 @@ export default function ImageElement({
         elementWidth: 0,
         elementHeight: 0,
     });
-    
+
     // Estados para UI
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -78,18 +78,16 @@ export default function ImageElement({
                 hue-rotate(${(element.filters?.hue ?? 0)}deg)
                 blur(${element.filters?.blur ?? 0}px)
             `.replace(/\s+/g, ' ').trim();
-            
-            img.style.transform = `scale(${element.filters?.scale ?? 1}) rotate(${
-                element.filters?.rotate ?? 0
-            }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${
-                element.filters?.flipVertical ? "scaleY(-1)" : ""
-            }`.replace(/\s+/g, ' ').trim();
-            
+
+            img.style.transform = `scale(${element.filters?.scale ?? 1}) rotate(${element.filters?.rotate ?? 0
+                }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${element.filters?.flipVertical ? "scaleY(-1)" : ""
+                }`.replace(/\s+/g, ' ').trim();
+
             img.style.mixBlendMode = element.filters?.blendMode ?? "normal";
             img.style.opacity = (element.filters?.opacity ?? 100) / 100;
-            
-           
-            
+
+
+
             // Forzar repaint
             img.style.willChange = 'filter, transform, opacity';
             setTimeout(() => {
@@ -101,18 +99,18 @@ export default function ImageElement({
         const handleClickOutside = (event) => {
             // Solo actuar si el elemento está seleccionado
             if (!isSelected) return;
-            
+
             // Si el clic fue dentro del elemento o sus controles, no hacer nada
             if (elementRef.current && elementRef.current.contains(event.target)) {
                 return;
             }
-            
+
             // Si el clic fue en cualquier control de resize (por si acaso)
-            if (event.target.classList.contains('bg-blue-500') || 
+            if (event.target.classList.contains('bg-blue-500') ||
                 event.target.getAttribute('title')?.includes('Redimensionar')) {
                 return;
             }
-            
+
             // Clic fuera del elemento - deseleccionar
             onSelect?.(null); // Deseleccionar el elemento
         };
@@ -126,7 +124,7 @@ export default function ImageElement({
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
             if (isSelected) {
-               // console.log('🧹 [ImageElement] Listener de clic fuera removido');
+                // console.log('🧹 [ImageElement] Listener de clic fuera removido');
             }
         };
     }, [isSelected, onSelect]);
@@ -141,11 +139,9 @@ export default function ImageElement({
             hue-rotate(${(element.filters?.hue ?? 0)}deg)
             blur(${Math.max(element.filters?.blur ?? 0, element.filters?.gaussianBlur ?? 0)}px)
         `.replace(/\s+/g, ' ').trim(),
-        transform: `scale(${element.filters?.scale ?? 1}) rotate(${
-            element.filters?.rotate ?? 0
-        }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${
-            element.filters?.flipVertical ? "scaleY(-1)" : ""
-        }`.replace(/\s+/g, ' ').trim(),
+        transform: `scale(${element.filters?.scale ?? 1}) rotate(${element.filters?.rotate ?? 0
+            }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${element.filters?.flipVertical ? "scaleY(-1)" : ""
+            }`.replace(/\s+/g, ' ').trim(),
         mixBlendMode: element.filters?.blendMode ?? "normal",
         opacity: (element.filters?.opacity ?? 100) / 100,
         zIndex: element.filters?.zIndex ?? 1,
@@ -164,7 +160,7 @@ export default function ImageElement({
 
     // Función para iniciar redimensionamiento
     const handleStartResize = useCallback((e, handle) => {
-        if (!isSelected) return;
+        if (!isSelected || disableResize) return;
         e.stopPropagation();
         e.preventDefault();
         setIsManipulating(true);
@@ -178,11 +174,11 @@ export default function ImageElement({
             elementWidth: currentSize.width,
             elementHeight: currentSize.height,
         });
-    }, [isSelected, currentPosition, currentSize]);
+    }, [isSelected, currentPosition, currentSize, disableResize]);
 
     // Función para iniciar movimiento
     const handleStartMove = useCallback((e) => {
-        if (!isSelected || e.target.closest('.resize-handle')) return;
+        if (!isSelected || e.target.closest('.resize-handle') || disableResize) return;
         e.stopPropagation();
         e.preventDefault();
         setIsManipulating(true);
@@ -199,7 +195,7 @@ export default function ImageElement({
 
     // Función para manejar manipulación (mover/redimensionar)
     const handleManipulate = useCallback((e) => {
-        if (!isManipulating || !startState) return;
+        if (!isManipulating || !startState || disableResize) return;
 
         const deltaX = e.clientX - startState.mouseX;
         const deltaY = e.clientY - startState.mouseY;
@@ -208,14 +204,14 @@ export default function ImageElement({
             // Movimiento
             const newX = Math.max(0, Math.min(workspaceSize.width - currentSize.width, startState.elementX + deltaX));
             const newY = Math.max(0, Math.min(workspaceSize.height - currentSize.height, startState.elementY + deltaY));
-            
+
             const updates = {
-                position: { 
-                    x: toRelative(newX, workspaceSize.width), 
-                    y: toRelative(newY, workspaceSize.height) 
+                position: {
+                    x: toRelative(newX, workspaceSize.width),
+                    y: toRelative(newY, workspaceSize.height)
                 },
             };
-            
+
             onUpdate(updates);
         } else if (manipulationType === 'resize') {
             // Redimensionamiento
@@ -225,7 +221,7 @@ export default function ImageElement({
             let newHeight = startState.elementHeight;
             let newX = startState.elementX;
             let newY = startState.elementY;
-            
+
             switch (resizeHandle) {
                 case "nw": // Esquina superior izquierda
                     newWidth = Math.max(minSize, startState.elementWidth - deltaX);
@@ -275,24 +271,24 @@ export default function ImageElement({
                     newX = startState.elementX + (startState.elementWidth - newWidth);
                     break;
             }
-            
+
             // Validar límites del workspace
             newX = Math.max(0, Math.min(workspaceSize.width - newWidth, newX));
             newY = Math.max(0, Math.min(workspaceSize.height - newHeight, newY));
             newWidth = Math.min(newWidth, workspaceSize.width - newX);
             newHeight = Math.min(newHeight, workspaceSize.height - newY);
-            
+
             const updates = {
-                position: { 
-                    x: toRelative(newX, workspaceSize.width), 
-                    y: toRelative(newY, workspaceSize.height) 
+                position: {
+                    x: toRelative(newX, workspaceSize.width),
+                    y: toRelative(newY, workspaceSize.height)
                 },
-                size: { 
-                    width: toRelative(newWidth, workspaceSize.width), 
-                    height: toRelative(newHeight, workspaceSize.height) 
+                size: {
+                    width: toRelative(newWidth, workspaceSize.width),
+                    height: toRelative(newHeight, workspaceSize.height)
                 },
             };
-            
+
             onUpdate(updates);
         }
     }, [isManipulating, manipulationType, startState, resizeHandle, workspaceSize, currentSize, onUpdate, toRelative]);
@@ -307,12 +303,13 @@ export default function ImageElement({
     // Funciones adicionales para manipulación avanzada
     const handleDoubleClick = useCallback((e) => {
         e.stopPropagation();
+        if (disableResize) return;
         // Doble clic para ajustar al tamaño original o centrar
         const naturalSize = {
             width: 200,
             height: 200,
         };
-        
+
         onUpdate({
             size: {
                 width: toRelative(naturalSize.width, workspaceSize.width),
@@ -323,11 +320,11 @@ export default function ImageElement({
 
     // Función para manejar atajos de teclado
     const handleKeyDown = useCallback((e) => {
-        if (!isSelected) return;
-        
+        if (!isSelected || disableResize) return;
+
         const step = e.shiftKey ? 10 : 1; // Movimiento más grande con Shift
         let updates = {};
-        
+
         switch (e.key) {
             case 'ArrowLeft':
                 e.preventDefault();
@@ -367,7 +364,7 @@ export default function ImageElement({
                 onSelect(); // Deseleccionar
                 break;
         }
-        
+
         if (Object.keys(updates).length > 0) {
             onUpdate(updates);
         }
@@ -389,10 +386,10 @@ export default function ImageElement({
         if (isManipulating) {
             const handleMouseMove = (e) => handleManipulate(e);
             const handleMouseUp = () => handleEndManipulation();
-            
+
             document.addEventListener("mousemove", handleMouseMove);
             document.addEventListener("mouseup", handleMouseUp);
-            
+
             return () => {
                 document.removeEventListener("mousemove", handleMouseMove);
                 document.removeEventListener("mouseup", handleMouseUp);
@@ -481,52 +478,51 @@ export default function ImageElement({
             nw: "nw-resize",
         };
         return cursors[handle] || "default";
-    };    return (
+    }; return (
         <div
             ref={ref}
             data-element-type="image"
-            className={`absolute ${
-                isSelected ? "ring-2 ring-blue-500 ring-opacity-75" : ""
-            } ${isDragging ? "opacity-50" : "opacity-100"}`}            style={{
-                left: `${currentPosition.x}px`,
-                top: `${currentPosition.y}px`,
-                width: `${currentSize.width}px`,
-                height: `${currentSize.height}px`,
-                cursor: getCursor(),
-                zIndex: element.zIndex || 5, // Z-index fijo - NO cambia al seleccionar para mantener capas
-                transition: isManipulating ? "none" : "all 0.1s ease-out",
-                pointerEvents: "all",
-                userSelect: "none",
-                transformOrigin: "center",
-            }}
+            className={`absolute ${isSelected ? "ring-2 ring-blue-500 ring-opacity-75" : ""
+                } ${isDragging ? "opacity-50" : "opacity-100"}`} style={{
+                    left: disableResize ? 0 : `${currentPosition.x}px`,
+                    top: disableResize ? 0 : `${currentPosition.y}px`,
+                    width: disableResize ? '100%' : `${currentSize.width}px`,
+                    height: disableResize ? '100%' : `${currentSize.height}px`,
+                    cursor: getCursor(),
+                    zIndex: element.zIndex || 5, // Z-index fijo - NO cambia al seleccionar para mantener capas
+                    transition: isManipulating ? "none" : "all 0.1s ease-out",
+                    pointerEvents: "all",
+                    userSelect: "none",
+                    transformOrigin: "center",
+                }}
             onClick={(e) => {
                 e.stopPropagation();
                 onSelect();
             }}
-            onMouseDown={handleStartMove}
+            onMouseDown={disableResize ? undefined : handleStartMove}
             onContextMenu={handleContextMenu}
             onDoubleClick={handleDoubleClick}
         >
             {/* Contenedor de la imagen */}
-            <div 
-                className={`w-full h-full overflow-hidden relative bg-transparent image-element`} 
+            <div
+                className={`w-full h-full overflow-hidden relative bg-transparent image-element`}
                 style={{
-                    clipPath: element.mask === 'circle' ? 'circle(50%)' : 
-                             element.mask === 'rounded' ? 'inset(0 round 8%)' : 
-                             element.mask === 'rounded-sm' ? 'inset(0 round 8%)' : 
-                             element.mask === 'rounded-lg' ? 'inset(0 round 16%)' : 
-                             element.mask === 'rounded-rect' ? 'inset(0 round 12%)' : 
-                             element.mask === 'star' ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' : 
-                             element.mask === 'hexagon' ? 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' : 
-                             element.mask === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 
-                             element.mask === 'diamond' ? 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' : 
-                             element.mask === 'polaroid' ? 'inset(5% 5% 15% 5% round 2%)' : 
-                             element.mask === 'vintage' ? 'inset(5% round 5% 5% 10% 5%)' : 
-                             element.mask === 'diagonal' ? 'polygon(0 0, 100% 0, 100% 80%, 0 100%)' : 
-                             element.mask === 'frame' ? 'inset(10% round 10%)' : 
-                             element.mask === 'blob1' ? 'path("M10,0 C15,0 20,5 20,10 C20,15 15,20 10,20 C5,20 0,15 0,10 C0,5 5,0 10,0 Z")' : 
-                             element.mask === 'blob2' ? 'path("M10,0 C15,5 20,10 15,15 C10,20 5,15 0,10 C5,5 5,5 10,0 Z")' : 
-                             element.mask === 'blob3' ? 'path("M10,0 C15,0 20,5 15,10 C20,15 15,20 10,15 C5,20 0,15 5,10 C0,5 5,0 10,0 Z")' : 'none'
+                    clipPath: element.mask === 'circle' ? 'circle(50%)' :
+                        element.mask === 'rounded' ? 'inset(0 round 8%)' :
+                            element.mask === 'rounded-sm' ? 'inset(0 round 8%)' :
+                                element.mask === 'rounded-lg' ? 'inset(0 round 16%)' :
+                                    element.mask === 'rounded-rect' ? 'inset(0 round 12%)' :
+                                        element.mask === 'star' ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' :
+                                            element.mask === 'hexagon' ? 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' :
+                                                element.mask === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' :
+                                                    element.mask === 'diamond' ? 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' :
+                                                        element.mask === 'polaroid' ? 'inset(5% 5% 15% 5% round 2%)' :
+                                                            element.mask === 'vintage' ? 'inset(5% round 5% 5% 10% 5%)' :
+                                                                element.mask === 'diagonal' ? 'polygon(0 0, 100% 0, 100% 80%, 0 100%)' :
+                                                                    element.mask === 'frame' ? 'inset(10% round 10%)' :
+                                                                        element.mask === 'blob1' ? 'path("M10,0 C15,0 20,5 20,10 C20,15 15,20 10,20 C5,20 0,15 0,10 C0,5 5,0 10,0 Z")' :
+                                                                            element.mask === 'blob2' ? 'path("M10,0 C15,5 20,10 15,15 C10,20 5,15 0,10 C5,5 5,5 10,0 Z")' :
+                                                                                element.mask === 'blob3' ? 'path("M10,0 C15,0 20,5 15,10 C20,15 15,20 10,15 C5,20 0,15 5,10 C0,5 5,0 10,0 Z")' : 'none'
                 }}
             >
                 <img
@@ -583,7 +579,7 @@ export default function ImageElement({
                             onMouseDown={(e) => handleStartResize(e, "sw")}
                             title="Redimensionar desde esquina inferior izquierda"
                         />
-                        
+
                         {/* Controles de los bordes */}
                         <div
                             className="resize-control-handle absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-n-resize"
@@ -611,7 +607,7 @@ export default function ImageElement({
                         />
 
                         {/* Indicador visual de manipulación   */}
-                      {isManipulating && (
+                        {isManipulating && (
                             <div className="resize-manipulation-indicator absolute -inset-2 border-2 border-blue-300 border-dashed rounded animate-pulse" style={{ zIndex: 9999 }} />
                         )}
                     </>
@@ -647,7 +643,7 @@ export default function ImageElement({
                     </button>
                 </div>
             )}*/}
-                {/* Menú contextual mejorado */}
+            {/* Menú contextual mejorado */}
             {showContextMenu && (
                 <>
                     <div
@@ -660,7 +656,7 @@ export default function ImageElement({
                         style={{
                             left: `${Math.min(contextMenuPos.x, window.innerWidth - 240)}px`,
                             top: `${Math.min(contextMenuPos.y, window.innerHeight - 200)}px`,
-                            zIndex: 9999, // Menu contextual siempre encima
+                            zIndex: 9999999, // Menu contextual siempre encima
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -700,9 +696,9 @@ export default function ImageElement({
                             <Copy className="h-4 w-4" />
                             Duplicar elemento
                         </button>
-                        
+
                         <div className="border-t border-gray-100 my-1" />
-                        
+
                         <button
                             className="w-full text-left px-4 py-2 hover:bg-yellow-50 flex items-center gap-3 text-sm text-gray-700 hover:text-yellow-700 transition-colors"
                             onClick={() => {
@@ -718,7 +714,7 @@ export default function ImageElement({
                             <CircleDot className="h-4 w-4" />
                             Reducir opacidad
                         </button>
-                        
+
                         <button
                             className="w-full text-left px-4 py-2 hover:bg-purple-50 flex items-center gap-3 text-sm text-gray-700 hover:text-purple-700 transition-colors"
                             onClick={() => {
@@ -736,9 +732,9 @@ export default function ImageElement({
                             </svg>
                             Reducir escala
                         </button>
-                        
+
                         <div className="border-t border-gray-100 my-1" />
-                        
+
                         <button
                             className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center gap-3 text-sm text-gray-700 hover:text-red-700 transition-colors"
                             onClick={() => {
@@ -758,7 +754,7 @@ export default function ImageElement({
                     {`${Math.round(currentPosition.x)}, ${Math.round(currentPosition.y)} | ${Math.round(currentSize.width)}×${Math.round(currentSize.height)}`}
                 </div>
             )}*/}
-          
+
         </div>
     );
 }
