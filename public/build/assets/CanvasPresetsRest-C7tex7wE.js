@@ -1,1 +1,0 @@
-var r=Object.defineProperty;var n=(a,s,e)=>s in a?r(a,s,{enumerable:!0,configurable:!0,writable:!0,value:e}):a[s]=e;var t=(a,s,e)=>n(a,typeof s!="symbol"?s+"":s,e);import{B as p}from"./BasicRest-DByHAxxD.js";class m extends p{constructor(){super(...arguments);t(this,"path","admin/canvas-presets")}}export{m as C};

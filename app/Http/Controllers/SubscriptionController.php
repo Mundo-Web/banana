@@ -27,11 +27,11 @@ class SubscriptionController extends BasicController
     {
         // Enviar correo de agradecimiento por suscripción
         //COMENTANDO MAIL
-      /*  if ($isNew && $jpa && $jpa->description) {
+      if ($isNew && $jpa && $jpa->description) {
             // $jpa ya es una instancia de Subscription y ahora es Notifiable
             $notificationService = new EmailNotificationService();
             $notificationService->sendToUser($jpa, new SubscriptionNotification());
-        } */
+        } 
         return null;
     }
 }

@@ -1,1 +1,0 @@
-import"./AboutSimple-Cf8x2fCZ.js";import"./index-BH53Isel.js";import{R as p}from"./PaymentModal-lELjrGc2.js";import"./index-yBjzXJbu.js";import"./index-B6ujFmsw.js";import"./index-Chjiymov.js";p.setAppElement("#app");

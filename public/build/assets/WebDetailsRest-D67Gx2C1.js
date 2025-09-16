@@ -1,1 +1,0 @@
-var i=Object.defineProperty;var m=(e,s,t)=>s in e?i(e,s,{enumerable:!0,configurable:!0,writable:!0,value:t}):e[s]=t;var a=(e,s,t)=>m(e,typeof s!="symbol"?s+"":s,t);import"./main-Byrjfx4U.js";import{B as o}from"./BasicRest-DByHAxxD.js";class l extends o{constructor(){super(...arguments);a(this,"path","admin/web-details")}}export{l as W};
