@@ -24,6 +24,7 @@
         "mercadopago/dx-php": "3.4.0",
         "phpmailer/phpmailer": "^6.9",
         "predis/predis": "*",
+        "sendinblue/api-v3-sdk": "^8.4",
         "sode/extend": "dev-master",
         "spatie/laravel-permission": "^6.7",
         "spatie/laravel-sitemap": "^7.3",

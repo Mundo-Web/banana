@@ -480,7 +480,7 @@ class SaleController extends BasicController
         $saleJpa = Sale::with('details')->find($jpa->id);
         $details = $saleJpa->details ?? SaleDetail::where('sale_id', $saleJpa->id)->get();
         //COMENTANDO MAIL
-        // $saleJpa->notify(new PurchaseSummaryNotification($saleJpa, $details));
+        $saleJpa->notify(new PurchaseSummaryNotification($saleJpa, $details));
 
         return $jpa;
     }
