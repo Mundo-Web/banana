@@ -3927,7 +3927,7 @@ export default function EditorLibro() {
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, []); // Sin dependencias para evitar el bucle
+    }, [saveQueueRef, pageChangesRef]); // Sin dependencias para evitar el bucle
 
     // Efecto de limpieza separado que solo se ejecuta al desmontar
     useEffect(() => {
@@ -4093,10 +4093,10 @@ export default function EditorLibro() {
             console.log('✅ [CART] Álbum agregado exitosamente, redirigiendo al carrito...');
 
             // Usar timeout para permitir que las notificaciones se muestren
-            setTimeout(() => {
+            // setTimeout(() => {
                 console.log('🔄 [CART] Ejecutando redirección a /cart');
                 window.location.href = '/cart';
-            }, 2000); // Aumentado a 2 segundos para mejor UX
+            // }, 2000); // Aumentado a 2 segundos para mejor UX
 
             return true;
 
