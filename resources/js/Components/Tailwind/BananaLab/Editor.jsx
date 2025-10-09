@@ -5157,7 +5157,7 @@ export default function EditorLibro() {
                                                     setAlbumPreparationModal(prev => ({
                                                         ...prev,
                                                         progress,
-                                                        subMessage: `Generando página ${pageCounter + 1} de ${pages.length}… \n- Por favor, no cambies de pestaña mientras terminamos.`
+                                                        subMessage: `Generando página ${pageCounter + 1} de ${pages.length}… <br>- Por favor, no cambies de pestaña mientras terminamos.`
                                                     }));
 
                                                     // Add small delay between pages to prevent UI freezing
