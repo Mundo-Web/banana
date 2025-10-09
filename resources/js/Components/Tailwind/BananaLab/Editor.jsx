@@ -4963,7 +4963,7 @@ export default function EditorLibro() {
                                     </h2>
 
                                     {/* Submensaje */}
-                                    <p className="text-gray-600 mb-6 text-base leading-relaxed">
+                                    <p className="text-gray-600 mb-6 text-base leading-relaxed whitespace-pre-line">
                                         {albumPreparationModal.subMessage}
                                     </p>
 
@@ -5157,7 +5157,7 @@ export default function EditorLibro() {
                                                     setAlbumPreparationModal(prev => ({
                                                         ...prev,
                                                         progress,
-                                                        subMessage: `Generando página ${pageCounter + 1} de ${pages.length}… <br>- Por favor, no cambies de pestaña mientras terminamos.`
+                                                        subMessage: `Generando página ${pageCounter + 1} de ${pages.length}…\nPor favor, no cambies de pestaña mientras terminamos.`
                                                     }));
 
                                                     // Add small delay between pages to prevent UI freezing

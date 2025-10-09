@@ -4210,7 +4210,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-Cr-XYlGv.js",
+    "file": "assets/BananaLab-BGDHxr-D.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isDynamicEntry": true,
@@ -4269,7 +4269,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor.jsx": {
-    "file": "assets/Editor-C1Oa8g9O.js",
+    "file": "assets/Editor-D05ng3PS.js",
     "name": "Editor",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
     "isDynamicEntry": true,
@@ -10017,7 +10017,7 @@
     ]
   },
   "resources/js/Pages/Canvas/Editor.jsx": {
-    "file": "assets/Editor-YFmQ58V6.js",
+    "file": "assets/Editor-ByIA2Iah.js",
     "name": "Editor",
     "src": "resources/js/Pages/Canvas/Editor.jsx",
     "isEntry": true,
@@ -10229,7 +10229,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-DIiR4r_Z.js",
+    "file": "assets/System-C5WGHUxX.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
