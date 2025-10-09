@@ -4631,11 +4631,13 @@ export default function EditorLibro() {
 
         let dataUrl;
         try {
+            await document.fonts.ready;
             dataUrl = await htmlToImage.toPng(wrapper, {
                 width: workspaceDimensions.width * scale,
                 height: workspaceDimensions.height * scale,
                 canvasWidth: workspaceDimensions.width * scale,
                 canvasHeight: workspaceDimensions.height * scale,
+                skipFonts: /Firefox/i.test(navigator.userAgent)
             });
         } finally {
             // Restaurar estado original
@@ -5155,7 +5157,7 @@ export default function EditorLibro() {
                                                     setAlbumPreparationModal(prev => ({
                                                         ...prev,
                                                         progress,
-                                                        subMessage: `Procesando página ${pageCounter + 1} de ${pages.length}...`
+                                                        subMessage: `Procesando página ${pageCounter + 1} de ${pages.length}...\nMantengase d`
                                                     }));
 
                                                     // Add small delay between pages to prevent UI freezing
