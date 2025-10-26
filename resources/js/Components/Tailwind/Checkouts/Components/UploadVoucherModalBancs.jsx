@@ -16,10 +16,10 @@ import { toast } from "sonner";
 import { CircleX } from "lucide-react";
 const salesRest = new SalesRest()
 
-export default function UploadVoucherModalBancs({ 
-    isOpen, 
-    onClose, 
-    onUpload, 
+export default function UploadVoucherModalBancs({
+    isOpen,
+    onClose,
+    onUpload,
     paymentMethod,
     cart,
     subTotal,
@@ -61,7 +61,7 @@ export default function UploadVoucherModalBancs({
 
     const handlePayment = async () => {
         if (saving) return;
-        
+
         if (!voucher) {
             toast.error('Error al subir comprobante', {
                 description: `Por favor, sube tu comprobante de pago`,
@@ -71,26 +71,49 @@ export default function UploadVoucherModalBancs({
             });
             return;
         }
-    
+
         setSaving(true);
-        
+
         try {
+            // const updatedRequest = {
+            //     ...request,
+            //     payment_proof: voucher,
+            //     details: JSON.stringify(request.cart.map((item) => ({
+            //         id: item.id,
+            //         quantity: item.quantity
+            //     }))),
+            // };
+
+            // const formData = new FormData();
+            // Object.keys(updatedRequest).forEach(key => {
+            //     formData.append(key, updatedRequest[key]);
+            // });
+
             const updatedRequest = {
                 ...request,
                 payment_proof: voucher,
-                details: JSON.stringify(request.cart.map((item) => ({
-                    id: item.id,
-                    quantity: item.quantity
-                }))),
+                // Asegurar que delivery_type tenga un valor por defecto
+                delivery_type: request.delivery_type || 'domicilio',
+                // Asegurar que applied_promotions sea JSON string si existe
+                applied_promotions: request.applied_promotions
+                    ? (typeof request.applied_promotions === 'string'
+                        ? request.applied_promotions
+                        : JSON.stringify(request.applied_promotions))
+                    : null
             };
-            
+
+            console.log('📤 Request actualizado:', updatedRequest);
+            console.log('📝 Details en request:', updatedRequest.details);
+
             const formData = new FormData();
             Object.keys(updatedRequest).forEach(key => {
-                formData.append(key, updatedRequest[key]);
+                if (updatedRequest[key] !== null && updatedRequest[key] !== undefined) {
+                    formData.append(key, updatedRequest[key]);
+                }
             });
-    
+
             const result = await salesRest.save(formData);
-            
+
             if (result) {
                 Local.delete(`${Global.APP_CORRELATIVE}_cart`)
                 location.href = `${location.origin}/cart?code=${result.code}`;
@@ -107,11 +130,11 @@ export default function UploadVoucherModalBancs({
             setSaving(false);
         }
     };
-    
+
     const handleUpload = async () => {
-        
+
         if (saving) return; // Evita múltiples ejecuciones
-        
+
         if (!voucher) {
             toast.success('Error al procesar el pago:', {
                 description: `Ocurrió un error al procesar tu pago`,
@@ -121,9 +144,9 @@ export default function UploadVoucherModalBancs({
             });
             return;
         }
-    
+
         setSaving(true); // Deshabilita el botón
-        
+
         try {
             const updatedRequest = {
                 ...request,
@@ -133,20 +156,20 @@ export default function UploadVoucherModalBancs({
                     quantity: item.quantity
                 }))),
             };
-            
+
             const formData = new FormData();
             Object.keys(updatedRequest).forEach(key => {
                 formData.append(key, updatedRequest[key]);
             });
-    
+
             const result = await salesRest.save(formData);
-            
+
             if (result) {
                 Local.delete(`${Global.APP_CORRELATIVE}_cart`)
                 location.href = `${location.origin}/cart?code=${result.code}`;
             }
         } catch (error) {
-            console.error("Error al procesar el pago:", );
+            console.error("Error al procesar el pago:",);
             toast.success('Error al procesar el pago:', {
                 description: `Ocurrió un error al procesar tu pago`,
                 icon: <CircleX className="h-5 w-5 text-red-500" />,
@@ -164,7 +187,7 @@ export default function UploadVoucherModalBancs({
         } else {
             document.body.style.overflow = "";
         }
-    
+
         return () => {
             document.body.style.overflow = "";
         };
@@ -183,8 +206,8 @@ export default function UploadVoucherModalBancs({
                 <div className="flex justify-center items-center z-40">
                     <a href="/" className="flex items-center gap-2">
                         <img src={`/assets/resources/logo.png?v=${crypto.randomUUID()}`} alt={Global.APP_NAME} className="h-14 object-contain object-center" onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = '/assets/img/logo-bk.svg';
+                            e.target.onerror = null;
+                            e.target.src = '/assets/img/logo-bk.svg';
                         }} />
                     </a>
                 </div>
@@ -194,18 +217,18 @@ export default function UploadVoucherModalBancs({
                 </h2>
 
                 <p className="customtext-primary mb-1 text-sm 2xl:text-base text-center">Estás a un paso de completar tu compra, realiza la transferencia/depósito a nuestras cuentas.</p>
-                
+
                 <div className="p-4 rounded-3xl bg-[#EAE8E6] flex flex-col gap-3 items-center">
                     <div className="flex flex-col gap-1 text-center customtext-primary font-semibold">
-                        <h2>SALA FABULOSA</h2>      
-                    </div> 
-                    
+                        <h2>SALA FABULOSA</h2>
+                    </div>
+
                     <div className="flex flex-col gap-3 w-full">
                         <BancDropdown contacts={contacts} />
                     </div>
-                  
-                </div>       
-              
+
+                </div>
+
                 {/* Resumen de compra */}
                 <div className="bg-[#EAE8E6] rounded-xl shadow-lg p-6 col-span-2 h-max font-font-general">
                     <h3 className="text-xl 2xl:text-2xl font-semibold pb-6 customtext-neutral-dark">Detalle de compras</h3>
@@ -259,7 +282,7 @@ export default function UploadVoucherModalBancs({
                                 S/ {Number2Currency(igv)}
                             </span>
                         </div>
-                         {coupon && (
+                        {coupon && (
                             <div className="mb-2 mt-2 flex justify-between items-center border-b pb-2 text-sm font-bold">
                                 <span>
                                     Cupón aplicado{" "}
@@ -280,7 +303,7 @@ export default function UploadVoucherModalBancs({
                                         >
                                             <i className="mdi mdi-information-outline ms-1"></i>
                                         </Tippy>{" "}
-                                        ({coupon.type === 'percentage' 
+                                        ({coupon.type === 'percentage'
                                             ? `-${Math.round(coupon.amount * 100) / 100}%`
                                             : `S/ -${Number2Currency(coupon.amount)}`})
                                     </small>
@@ -320,12 +343,12 @@ export default function UploadVoucherModalBancs({
                         className="hidden"
                     />
 
-                     {/* File preview area */}
-                     {voucher && (
+                    {/* File preview area */}
+                    {voucher && (
                         <div className="bg-[#f1f1f1] p-4 rounded-lg border border-dashed">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm truncate">{voucher.name}</span>
-                                <button 
+                                <button
                                     onClick={handleRemoveFile}
                                     className="text-red-500 hover:text-red-700"
                                 >
@@ -334,16 +357,16 @@ export default function UploadVoucherModalBancs({
                             </div>
                             {voucher.type.startsWith('image/') && (
                                 <div className="mt-2">
-                                    <img 
-                                        src={URL.createObjectURL(voucher)} 
-                                        alt="Voucher preview" 
+                                    <img
+                                        src={URL.createObjectURL(voucher)}
+                                        alt="Voucher preview"
                                         className="max-h-28 mx-auto"
                                     />
                                 </div>
                             )}
                         </div>
                     )}
-                    
+
                     {/* <div className="pt-2 space-y-3">
                         <button
                             onClick={handleUpload}
@@ -368,17 +391,16 @@ export default function UploadVoucherModalBancs({
                         <button
                             onClick={handleUploadClick}
                             disabled={saving}
-                            className={`w-full bg-primary text-white text-sm 2xl:text-base py-3 rounded-3xl font-medium ${
-                                saving ? "opacity-70 cursor-not-allowed" : ""
-                            }`}
+                            className={`w-full bg-primary text-white text-sm 2xl:text-base py-3 rounded-3xl font-medium ${saving ? "opacity-70 cursor-not-allowed" : ""
+                                }`}
                         >
-                            {saving 
-                                ? "Procesando..." 
-                                : voucher 
-                                    ? "Confirmar pago" 
+                            {saving
+                                ? "Procesando..."
+                                : voucher
+                                    ? "Confirmar pago"
                                     : "Subir comprobante"}
                         </button>
-                        
+
                         <button
                             onClick={onClose}
                             className="w-full border border-primary text-sm 2xl:text-base py-3 rounded-3xl font-medium"
@@ -386,7 +408,7 @@ export default function UploadVoucherModalBancs({
                             Cancelar
                         </button>
                     </div>
-                    
+
                 </div>
             </div>
         </ReactModal>
